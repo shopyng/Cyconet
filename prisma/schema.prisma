@@ -1,0 +1,262 @@
+// Cyconet learning platform database schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// Users & Authentication
+// ============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // bcrypt hashed
+  name      String
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+
+  enrollments        Enrollment[]
+  progress           Progress[]
+  examAttempts       ExamAttempt[]
+  projectSubmissions ProjectSubmission[]
+  certificates       Certificate[]
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+// ============================================================================
+// Application & Admissions
+// ============================================================================
+
+model Application {
+  id          String            @id @default(cuid())
+  name        String
+  email       String
+  phone       String
+  track       String            // program ID (e.g., "cybersecurity")
+  experience  String
+  motivation  String            @db.Text
+  status      ApplicationStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  String?           // admin user ID
+  reviewNotes String?           @db.Text
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// ============================================================================
+// Programs & Curriculum
+// ============================================================================
+
+model Program {
+  id          String @id // e.g., "cybersecurity", "software-engineering"
+  title       String
+  duration    String
+  description String @db.Text
+
+  modules      Module[]
+  enrollments  Enrollment[]
+  exams        Exam[]
+  projects     Project[]
+  certificates Certificate[]
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  programId String
+  startedAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, programId])
+  @@index([userId])
+  @@index([programId])
+}
+
+model Module {
+  id          String  @id @default(cuid())
+  programId   String
+  title       String
+  description String  @db.Text
+  order       Int
+
+  program Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([programId])
+}
+
+model Lesson {
+  id          String @id @default(cuid())
+  moduleId    String
+  title       String
+  content     String @db.Text  // Markdown
+  videoUrl    String?
+  order       Int
+
+  module   Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress Progress[]
+
+  @@index([moduleId])
+}
+
+// ============================================================================
+// Progress Tracking
+// ============================================================================
+
+model Progress {
+  id          String    @id @default(cuid())
+  userId      String
+  lessonId    String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+}
+
+// ============================================================================
+// Exams & Assessments
+// ============================================================================
+
+model Exam {
+  id           String @id @default(cuid())
+  programId    String
+  title        String
+  description  String @db.Text
+  passingScore Int    @default(70)  // percentage
+
+  program   Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  questions ExamQuestion[]
+  attempts  ExamAttempt[]
+
+  @@index([programId])
+}
+
+model ExamQuestion {
+  id       String @id @default(cuid())
+  examId   String
+  question String @db.Text
+  options  Json   // ["Option A", "Option B", "Option C", "Option D"]
+  correct  String // "A", "B", "C", or "D"
+  order    Int
+
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+}
+
+model ExamAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  examId      String
+  score       Int      // percentage 0-100
+  answers     Json     // Record<questionId, selectedOption>
+  passed      Boolean
+  attemptedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([examId])
+}
+
+// ============================================================================
+// Projects & Submissions
+// ============================================================================
+
+model Project {
+  id           String @id @default(cuid())
+  programId    String
+  title        String
+  description  String @db.Text
+  requirements String @db.Text
+
+  program     Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+  submissions ProjectSubmission[]
+
+  @@index([programId])
+}
+
+model ProjectSubmission {
+  id          String           @id @default(cuid())
+  userId      String
+  projectId   String
+  repoUrl     String?
+  demoUrl     String?
+  description String           @db.Text
+  status      SubmissionStatus @default(PENDING)
+  feedback    String?          @db.Text
+  submittedAt DateTime         @default(now())
+  reviewedAt  DateTime?
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  NEEDS_REVISION
+}
+
+// ============================================================================
+// Certificates
+// ============================================================================
+
+model Certificate {
+  id               String   @id @default(cuid())
+  userId           String
+  programId        String
+  issuedAt         DateTime @default(now())
+  verificationCode String   @unique
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, programId])
+  @@index([userId])
+  @@index([programId])
+}
+
+// ============================================================================
+// Timetable
+// ============================================================================
+
+model TimetableEntry {
+  id          String   @id @default(cuid())
+  programId   String
+  title       String
+  description String?  @db.Text
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  createdAt   DateTime @default(now())
+
+  @@index([programId])
+  @@index([startTime])
+}

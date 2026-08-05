@@ -76,7 +76,7 @@ function Shell({
 export function TextField({
   type = 'text',
   ...props
-}: BaseProps & { type?: 'text' | 'email' | 'tel' | 'date' }) {
+}: BaseProps & { type?: 'text' | 'email' | 'tel' | 'date' | 'password' }) {
   const { describedBy } = useIds(props.name, props.error, props.hint);
   return (
     <Shell {...props}>

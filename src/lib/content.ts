@@ -14,10 +14,34 @@
  * Canonical origin. Override per-environment with NEXT_PUBLIC_SITE_URL —
  * metadataBase, the sitemap, robots.txt and the JSON-LD graph all derive
  * absolute URLs from this single value.
+ *
+ * Whatever host you choose here is the canonical one. Pick either the apex or
+ * the www subdomain and redirect the other at the DNS/host level; serving both
+ * splits ranking signals between two URLs for identical content.
  */
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://cyconet.com'
-).replace(/\/$/, '');
+function normalizeOrigin(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, '');
+
+  // A bare domain ("www.cyconet.ng") is the natural way to write this, but
+  // `new URL()` rejects it and metadataBase would throw during the build.
+  // Assume https, the only sensible scheme for a production origin.
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    // Fail with something actionable rather than a bare "Invalid URL" thrown
+    // from deep inside metadata generation.
+    throw new Error(
+      `NEXT_PUBLIC_SITE_URL is not a valid origin: "${raw}". ` +
+        'Expected something like https://www.cyconet.ng',
+    );
+  }
+}
+
+export const SITE_URL = normalizeOrigin(
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://cyconet.com',
+);
 
 export const brand = {
   name: 'Cyconet',
@@ -34,8 +58,13 @@ export const brand = {
   shortDescription:
     'Cyconet is a cybersecurity academy and tech school in Ibadan, Nigeria, training engineers in cybersecurity, software engineering, data science, AI and cloud — alongside a tech solutions agency and a co-working tech hub under one roof.',
   founded: '2019',
-  email: 'hello@cyconet.com',
-  phone: '+234 800 000 0000',
+  email: 'cyconet@outlook.com',
+  /**
+   * E.164, which is what schema.org `telephone` and `tel:` links expect.
+   * `phoneDisplay` is the human-readable grouping shown in the footer.
+   */
+  phone: '+2347012036101',
+  phoneDisplay: '+234 701 203 6101',
   address: {
     street: 'Akala Expressway',
     locality: 'Ibadan',

@@ -73,8 +73,18 @@ export default function Footer() {
           <p style={styles.legalText}>
             © {new Date().getFullYear()} {brand.name}. All rights reserved.
           </p>
+          {/*
+            Address, phone and email in one line. The phone is a `tel:` link on
+            the E.164 number while displaying the grouped form — on a phone this
+            is a tap to call, which for a local business is often the fastest
+            route a visitor has to a human.
+          */}
           <p style={styles.legalText}>
             {brand.address.street}, {brand.address.locality} ·{' '}
+            <a href={`tel:${brand.phone}`} className="cn-foot-link">
+              {brand.phoneDisplay}
+            </a>{' '}
+            ·{' '}
             <a href={`mailto:${brand.email}`} className="cn-foot-link">
               {brand.email}
             </a>

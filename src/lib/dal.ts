@@ -145,6 +145,163 @@ export const lessonForStudent = cache(async (lessonId: string) => {
   return { lesson, completed: progress?.completed ?? false };
 });
 
+/**
+ * True when the signed-in student is enrolled on `programId`.
+ *
+ * The gate every program-scoped read goes through. Enrolment — not merely
+ * holding a session — is what grants access to curriculum, exams and projects.
+ */
+export const isEnrolled = cache(async (programId: string): Promise<boolean> => {
+  const user = await verifySession();
+  const enrollment = await db.enrollment.findUnique({
+    where: { userId_programId: { userId: user.id, programId } },
+    select: { id: true },
+  });
+  return enrollment !== null;
+});
+
+/**
+ * One programme with its full curriculum, but only if this student is on it.
+ * Null otherwise, so callers render notFound() rather than confirming that a
+ * programme they cannot see exists.
+ */
+export const programForStudent = cache(async (programId: string) => {
+  if (!(await isEnrolled(programId))) return null;
+
+  return db.program.findUnique({
+    where: { id: programId },
+    include: {
+      modules: {
+        orderBy: { order: 'asc' },
+        include: { lessons: { orderBy: { order: 'asc' } } },
+      },
+    },
+  });
+});
+
+/** Every exam across this student's programmes, with the programme title. */
+export const myExams = cache(async () => {
+  const user = await verifySession();
+  const enrollments = await db.enrollment.findMany({
+    where: { userId: user.id },
+    select: { programId: true },
+  });
+
+  return db.exam.findMany({
+    where: { programId: { in: enrollments.map((e) => e.programId) } },
+    include: {
+      program: { select: { id: true, title: true } },
+      questions: { select: { id: true } },
+    },
+    orderBy: { title: 'asc' },
+  });
+});
+
+/**
+ * One exam with its questions, enrolment-checked.
+ *
+ * `correct` is deliberately NOT selected. The questions are rendered into a
+ * page the student can view source on, so shipping the answer key would make
+ * the exam meaningless. Grading re-reads the correct answers server-side.
+ */
+export const examForStudent = cache(async (examId: string) => {
+  const exam = await db.exam.findUnique({
+    where: { id: examId },
+    include: {
+      program: { select: { id: true, title: true } },
+      questions: {
+        orderBy: { order: 'asc' },
+        select: { id: true, question: true, options: true, order: true },
+      },
+    },
+  });
+  if (!exam) return null;
+  if (!(await isEnrolled(exam.programId))) return null;
+  return exam;
+});
+
+/** Every attempt this student has made at one exam, newest first. */
+export const myAttemptsForExam = cache(async (examId: string) => {
+  const user = await verifySession();
+  return db.examAttempt.findMany({
+    where: { userId: user.id, examId },
+    orderBy: { attemptedAt: 'desc' },
+  });
+});
+
+/** Every project across this student's programmes. */
+export const myProjects = cache(async () => {
+  const user = await verifySession();
+  const enrollments = await db.enrollment.findMany({
+    where: { userId: user.id },
+    select: { programId: true },
+  });
+
+  return db.project.findMany({
+    where: { programId: { in: enrollments.map((e) => e.programId) } },
+    include: { program: { select: { id: true, title: true } } },
+    orderBy: { title: 'asc' },
+  });
+});
+
+/** One project with this student's submission history, enrolment-checked. */
+export const projectForStudent = cache(async (projectId: string) => {
+  const user = await verifySession();
+
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    include: { program: { select: { id: true, title: true } } },
+  });
+  if (!project) return null;
+  if (!(await isEnrolled(project.programId))) return null;
+
+  const submissions = await db.projectSubmission.findMany({
+    where: { userId: user.id, projectId },
+    orderBy: { submittedAt: 'desc' },
+  });
+
+  return { project, submissions };
+});
+
+/**
+ * Scheduled sessions for this student's programmes, split at "now".
+ *
+ * The partition happens here rather than in the page because a Server
+ * Component must be pure — reading the clock during render is exactly what
+ * `react-hooks/purity` forbids. This module is not a component, and a
+ * per-request read of the current time is the intended behaviour.
+ */
+export const myTimetable = cache(async () => {
+  const user = await verifySession();
+  const enrollments = await db.enrollment.findMany({
+    where: { userId: user.id },
+    include: { program: { select: { id: true, title: true } } },
+  });
+
+  const titles = new Map(enrollments.map((e) => [e.programId, e.program.title]));
+  const entries = await db.timetableEntry.findMany({
+    where: { programId: { in: [...titles.keys()] } },
+    orderBy: { startTime: 'asc' },
+  });
+
+  return splitByTime(
+    entries.map((entry) => ({
+      ...entry,
+      programTitle: titles.get(entry.programId) ?? entry.programId,
+    })),
+  );
+});
+
+/** Certificates this student has earned. */
+export const myCertificates = cache(async () => {
+  const user = await verifySession();
+  return db.certificate.findMany({
+    where: { userId: user.id },
+    include: { program: { select: { id: true, title: true, duration: true } } },
+    orderBy: { issuedAt: 'desc' },
+  });
+});
+
 /* ------------------------------------------------------------------ *
  * Certificate eligibility
  * ------------------------------------------------------------------ */
@@ -263,6 +420,205 @@ export const pendingSubmissions = cache(async () => {
       project: { select: { id: true, title: true, programId: true } },
     },
     orderBy: { submittedAt: 'asc' },
+  });
+});
+
+/** One application, or null. */
+export const applicationById = cache(async (id: string) => {
+  await verifyAdmin();
+  return db.application.findUnique({ where: { id } });
+});
+
+/**
+ * One student with everything staff need on a single screen: enrolments,
+ * per-programme progress, attempts, submissions and certificates.
+ */
+export const studentById = cache(async (id: string) => {
+  await verifyAdmin();
+
+  const student = await db.user.findUnique({
+    where: { id },
+    include: {
+      enrollments: {
+        include: { program: { select: { id: true, title: true, duration: true } } },
+        orderBy: { startedAt: 'asc' },
+      },
+      examAttempts: {
+        include: { exam: { select: { id: true, title: true, passingScore: true } } },
+        orderBy: { attemptedAt: 'desc' },
+      },
+      projectSubmissions: {
+        include: { project: { select: { id: true, title: true } } },
+        orderBy: { submittedAt: 'desc' },
+      },
+      certificates: {
+        include: { program: { select: { id: true, title: true } } },
+        orderBy: { issuedAt: 'desc' },
+      },
+    },
+  });
+  // Staff pages are for students; an admin ID here is a mistyped URL, not a hit.
+  if (!student || student.role !== 'STUDENT') return null;
+
+  const progress = await eligibility_forEnrollments(student.id, student.enrollments);
+  return { student, progress };
+});
+
+/** Eligibility for each of a student's programmes, keyed by programme ID. */
+async function eligibility_forEnrollments(
+  userId: string,
+  enrollments: readonly { programId: string }[],
+): Promise<Map<string, Eligibility>> {
+  const entries = await Promise.all(
+    enrollments.map(async (e) => [e.programId, await eligibility(userId, e.programId)] as const),
+  );
+  return new Map(entries);
+}
+
+/** Every submission, newest first — the review queue's history view. */
+export const allSubmissions = cache(async () => {
+  await verifyAdmin();
+  return db.projectSubmission.findMany({
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      project: { select: { id: true, title: true, programId: true } },
+    },
+    orderBy: { submittedAt: 'desc' },
+  });
+});
+
+/** One submission with the full project brief, for the review screen. */
+export const submissionById = cache(async (id: string) => {
+  await verifyAdmin();
+  return db.projectSubmission.findUnique({
+    where: { id },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      project: true,
+    },
+  });
+});
+
+/** Every programme with curriculum counts, for the curriculum index. */
+export const allPrograms = cache(async () => {
+  await verifyAdmin();
+  return db.program.findMany({
+    include: {
+      modules: {
+        orderBy: { order: 'asc' },
+        include: { lessons: { orderBy: { order: 'asc' } } },
+      },
+      exams: { include: { questions: { select: { id: true } } } },
+      projects: true,
+      _count: { select: { enrollments: true } },
+    },
+    orderBy: { title: 'asc' },
+  });
+});
+
+/** One programme's full curriculum, for the staff detail view. */
+export const programForAdmin = cache(async (programId: string) => {
+  await verifyAdmin();
+  return db.program.findUnique({
+    where: { id: programId },
+    include: {
+      modules: {
+        orderBy: { order: 'asc' },
+        include: { lessons: { orderBy: { order: 'asc' } } },
+      },
+      exams: { include: { questions: { select: { id: true } } } },
+      projects: true,
+      _count: { select: { enrollments: true } },
+    },
+  });
+});
+
+/** Every issued certificate, newest first. */
+export const allCertificates = cache(async () => {
+  await verifyAdmin();
+  return db.certificate.findMany({
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      program: { select: { id: true, title: true } },
+    },
+    orderBy: { issuedAt: 'desc' },
+  });
+});
+
+/**
+ * Students who have met every gate on a programme but hold no certificate yet
+ * — the "ready to issue" queue.
+ *
+ * Deliberately computed rather than stored: eligibility() is the single
+ * definition of finished, so this list can never disagree with the student's
+ * own progress panel.
+ */
+export const certificateCandidates = cache(async () => {
+  await verifyAdmin();
+
+  const enrollments = await db.enrollment.findMany({
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      program: { select: { id: true, title: true } },
+    },
+  });
+  const issued = await db.certificate.findMany({
+    select: { userId: true, programId: true },
+  });
+  const has = new Set(issued.map((c) => `${c.userId}:${c.programId}`));
+
+  const candidates = await Promise.all(
+    enrollments
+      .filter((e) => !has.has(`${e.userId}:${e.programId}`))
+      .map(async (e) => ({ enrollment: e, status: await eligibility(e.userId, e.programId) })),
+  );
+
+  return candidates.filter((c) => c.status.eligible);
+});
+
+/** Every scheduled session with its programme title, split at "now". */
+export const allTimetableEntries = cache(async () => {
+  await verifyAdmin();
+  const [entries, programs] = await Promise.all([
+    db.timetableEntry.findMany({ orderBy: { startTime: 'asc' } }),
+    db.program.findMany({ select: { id: true, title: true } }),
+  ]);
+
+  const titles = new Map(programs.map((p) => [p.id, p.title]));
+  return splitByTime(
+    entries.map((entry) => ({
+      ...entry,
+      programTitle: titles.get(entry.programId) ?? entry.programId,
+    })),
+  );
+});
+
+/**
+ * Partition timetable entries into upcoming and past.
+ *
+ * A session counts as upcoming until it *ends*, so one in progress right now
+ * still shows under "upcoming" rather than vanishing mid-class. Past entries
+ * come back newest-first, which is the useful order for a historical list.
+ */
+function splitByTime<T extends { endTime: Date }>(entries: readonly T[]) {
+  const now = Date.now();
+  const upcoming: T[] = [];
+  const past: T[] = [];
+
+  for (const entry of entries) {
+    if (entry.endTime.getTime() >= now) upcoming.push(entry);
+    else past.push(entry);
+  }
+
+  return { upcoming, past: past.reverse(), total: entries.length };
+}
+
+/** Programme id/title pairs for form dropdowns. */
+export const programOptions = cache(async () => {
+  await verifyAdmin();
+  return db.program.findMany({
+    select: { id: true, title: true },
+    orderBy: { title: 'asc' },
   });
 });
 

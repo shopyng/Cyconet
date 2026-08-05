@@ -40,7 +40,7 @@ export default async function StudentDetailPage({
   return (
     <div style={{ maxWidth: 820 }}>
       <PageTitle title={student.name} lede={student.email}>
-        <BackLink href="/admin/students" label="All students" />
+        <BackLink href="/students" label="All students" />
       </PageTitle>
 
       <p style={styles.joined}>Joined {formatDate(student.createdAt)}</p>
@@ -161,7 +161,7 @@ export default async function StudentDetailPage({
             <ul style={styles.plainList}>
               {student.projectSubmissions.map((submission) => (
                 <li key={submission.id} style={styles.plainItem}>
-                  <a href={`/admin/submissions/${submission.id}`} style={styles.link}>
+                  <a href={`/submissions/${submission.id}`} style={styles.link}>
                     {submission.project.title}
                   </a>
                   <Badge tone={statusTone(submission.status)}>

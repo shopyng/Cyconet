@@ -13,12 +13,12 @@ import Shell, { type NavItem } from '@/components/app/Shell';
  */
 
 const NAV: readonly NavItem[] = [
-  { href: '/learning', label: 'Dashboard', exact: true },
-  { href: '/learning/courses', label: 'Courses' },
-  { href: '/learning/exams', label: 'Exams' },
-  { href: '/learning/projects', label: 'Projects' },
-  { href: '/learning/timetable', label: 'Timetable' },
-  { href: '/learning/certificate', label: 'Certificate' },
+  { href: '/', label: 'Dashboard', exact: true },
+  { href: '/courses', label: 'Courses' },
+  { href: '/exams', label: 'Exams' },
+  { href: '/projects', label: 'Projects' },
+  { href: '/timetable', label: 'Timetable' },
+  { href: '/certificate', label: 'Certificate' },
 ];
 
 export default async function LearningAppLayout({
@@ -26,7 +26,7 @@ export default async function LearningAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await verifySession('learning');
+  const user = await verifySession();
 
   /*
    * The active nav item is resolved on the server so it is correct in the first
@@ -36,7 +36,7 @@ export default async function LearningAppLayout({
    * x-pathname is set by the proxy; it survives the rewrite, whereas
    * nextUrl.pathname inside the app already shows the rewritten /learning/... form.
    */
-  const pathname = (await headers()).get('x-pathname') ?? '/learning';
+  const pathname = (await headers()).get('x-pathname') ?? '/';
 
   return (
     <Shell

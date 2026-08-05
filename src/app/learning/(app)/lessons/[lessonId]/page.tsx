@@ -38,7 +38,7 @@ export default async function LessonPage({
 
   return (
     <article style={styles.wrap}>
-      <BackLink href={`/learning/courses/${module.programId}`} label={module.program.title} />
+      <BackLink href={`/courses/${module.programId}`} label={module.program.title} />
 
       <header style={styles.header}>
         <span style={styles.eyebrow}>
@@ -89,7 +89,7 @@ export default async function LessonPage({
 
       <nav style={styles.pager} aria-label="Lesson navigation">
         {previous ? (
-          <a href={`/learning/lessons/${previous.id}`} style={styles.pagerLink}>
+          <a href={`/lessons/${previous.id}`} style={styles.pagerLink}>
             <span style={styles.pagerLabel}>Previous</span>
             <span style={styles.pagerTitle}>{previous.title}</span>
           </a>
@@ -97,7 +97,7 @@ export default async function LessonPage({
           <span />
         )}
         {next ? (
-          <a href={`/learning/lessons/${next.id}`} style={{ ...styles.pagerLink, textAlign: 'right' }}>
+          <a href={`/lessons/${next.id}`} style={{ ...styles.pagerLink, textAlign: 'right' }}>
             <span style={styles.pagerLabel}>Next</span>
             <span style={styles.pagerTitle}>{next.title}</span>
           </a>

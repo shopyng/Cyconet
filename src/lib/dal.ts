@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { db } from './db';
 import { getSession, type SessionUser } from './auth';
+import { tenantUrl } from './tenant';
 
 /**
  * Data Access Layer.
@@ -25,22 +26,30 @@ export const currentUser = cache(async (): Promise<SessionUser | null> => {
   return getSession();
 });
 
-/** Session or redirect to the tenant's login. */
-export const verifySession = cache(
-  async (tenant: 'learning' | 'admin' = 'learning'): Promise<SessionUser> => {
-    const user = await getSession();
-    if (!user) redirect(`/${tenant}/login`);
-    return user;
-  },
-);
+/**
+ * Session or redirect to the tenant's login.
+ *
+ * `/login` — not `/learning/login`. The prefix is internal to the rewrite; the
+ * proxy 404s any path that arrives carrying it, and a redirect Location goes
+ * back to the browser as a fresh request on the same host.
+ */
+export const verifySession = cache(async (): Promise<SessionUser> => {
+  const user = await getSession();
+  if (!user) redirect('/login');
+  return user;
+});
 
 /** Session with the ADMIN role, or redirect. */
 export const verifyAdmin = cache(async (): Promise<SessionUser> => {
   const user = await getSession();
-  if (!user) redirect('/admin/login');
-  // A student who somehow reaches an admin URL is bounced to their own hub
-  // rather than shown a login form they are already past.
-  if (user.role !== 'ADMIN') redirect('/learning');
+  if (!user) redirect('/login');
+  /*
+   * A signed-in student who reaches an admin URL is sent to their own hub rather
+   * than shown a login form they are already past. That hub is on another host,
+   * so this one needs an absolute URL — a bare '/' would just land them back on
+   * the admin dashboard and bounce again.
+   */
+  if (user.role !== 'ADMIN') redirect(await tenantUrl('learning'));
   return user;
 });
 

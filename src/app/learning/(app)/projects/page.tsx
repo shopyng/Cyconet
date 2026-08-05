@@ -70,7 +70,7 @@ export default async function ProjectsPage() {
                 </p>
               ) : null}
 
-              <a href={`/learning/projects/${project.id}`} style={styles.link}>
+              <a href={`/projects/${project.id}`} style={styles.link}>
                 {submission ? 'View brief and feedback' : 'View brief and submit'} →
               </a>
             </Card>

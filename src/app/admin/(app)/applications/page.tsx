@@ -89,7 +89,7 @@ function Row({
 }) {
   return (
     <Card padded={false}>
-      <a href={`/admin/applications/${application.id}`} style={styles.row}>
+      <a href={`/applications/${application.id}`} style={styles.row}>
         <div style={styles.rowMain}>
           <strong style={styles.name}>{application.name}</strong>
           <span style={styles.email}>{application.email}</span>

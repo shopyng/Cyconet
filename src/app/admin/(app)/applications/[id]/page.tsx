@@ -34,7 +34,7 @@ export default async function ApplicationDetailPage({
   return (
     <div style={{ maxWidth: 720 }}>
       <PageTitle title={application.name}>
-        <BackLink href="/admin/applications" label="All applications" />
+        <BackLink href="/applications" label="All applications" />
       </PageTitle>
 
       <div style={{ marginTop: '0.9rem' }}>

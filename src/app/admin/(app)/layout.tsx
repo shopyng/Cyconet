@@ -12,13 +12,13 @@ import Shell, { type NavItem } from '@/components/app/Shell';
  */
 
 const NAV: readonly NavItem[] = [
-  { href: '/admin', label: 'Overview', exact: true },
-  { href: '/admin/applications', label: 'Applications' },
-  { href: '/admin/students', label: 'Students' },
-  { href: '/admin/submissions', label: 'Project review' },
-  { href: '/admin/curriculum', label: 'Curriculum' },
-  { href: '/admin/certificates', label: 'Certificates' },
-  { href: '/admin/timetable', label: 'Timetable' },
+  { href: '/', label: 'Overview', exact: true },
+  { href: '/applications', label: 'Applications' },
+  { href: '/students', label: 'Students' },
+  { href: '/submissions', label: 'Project review' },
+  { href: '/curriculum', label: 'Curriculum' },
+  { href: '/certificates', label: 'Certificates' },
+  { href: '/timetable', label: 'Timetable' },
 ];
 
 export default async function AdminAppLayout({
@@ -27,7 +27,7 @@ export default async function AdminAppLayout({
   children: React.ReactNode;
 }) {
   const user = await verifyAdmin();
-  const pathname = (await headers()).get('x-pathname') ?? '/admin';
+  const pathname = (await headers()).get('x-pathname') ?? '/';
 
   return (
     <Shell

@@ -68,7 +68,7 @@ export default async function CoursesPage() {
                 {lessons.length === 1 ? 'lesson' : 'lessons'}
               </p>
 
-              <a href={`/learning/courses/${program.id}`} style={styles.link}>
+              <a href={`/courses/${program.id}`} style={styles.link}>
                 {done === 0 ? 'Start course' : done === lessons.length ? 'Review course' : 'Continue'} →
               </a>
             </Card>

@@ -27,7 +27,7 @@ export default async function CurriculumDetailPage({
   return (
     <div style={{ maxWidth: 820 }}>
       <PageTitle title={program.title} lede={program.description}>
-        <BackLink href="/admin/curriculum" label="All programmes" />
+        <BackLink href="/curriculum" label="All programmes" />
       </PageTitle>
 
       <div style={styles.summary}>

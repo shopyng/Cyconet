@@ -68,7 +68,7 @@ export default async function CurriculumPage() {
                 <Stat label="Enrolled" value={program._count.enrollments} />
               </dl>
 
-              <a href={`/admin/curriculum/${program.id}`} style={styles.link}>
+              <a href={`/curriculum/${program.id}`} style={styles.link}>
                 View curriculum →
               </a>
             </Card>

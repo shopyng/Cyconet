@@ -33,10 +33,10 @@ export default async function AdminDashboard() {
       <p style={styles.lede}>Platform activity at a glance.</p>
 
       <div style={styles.grid}>
-        <Stat label="Pending applications" value={applications.length} href="/admin/applications" />
-        <Stat label="Enrolled students" value={enrolled} href="/admin/students" />
-        <Stat label="Project submissions" value={submissions.length} href="/admin/submissions" />
-        <Stat label="Certificates issued" value={withCerts} href="/admin/certificates" />
+        <Stat label="Pending applications" value={applications.length} href="/applications" />
+        <Stat label="Enrolled students" value={enrolled} href="/students" />
+        <Stat label="Project submissions" value={submissions.length} href="/submissions" />
+        <Stat label="Certificates issued" value={withCerts} href="/certificates" />
       </div>
 
       {applications.length > 0 ? (
@@ -45,7 +45,7 @@ export default async function AdminDashboard() {
           <ul style={styles.list}>
             {applications.slice(0, 5).map((app) => (
               <li key={app.id} style={styles.item}>
-                <a href={`/admin/applications/${app.id}`} style={styles.itemLink}>
+                <a href={`/applications/${app.id}`} style={styles.itemLink}>
                   <strong style={{ color: color.text }}>{app.name}</strong>
                   <span style={{ color: color.textMuted, fontSize: font.small }}>
                     {app.track} · {new Date(app.createdAt).toLocaleDateString('en-GB')}
@@ -63,7 +63,7 @@ export default async function AdminDashboard() {
           <ul style={styles.list}>
             {submissions.slice(0, 5).map((sub) => (
               <li key={sub.id} style={styles.item}>
-                <a href={`/admin/submissions/${sub.id}`} style={styles.itemLink}>
+                <a href={`/submissions/${sub.id}`} style={styles.itemLink}>
                   <strong style={{ color: color.text }}>
                     {sub.user.name} · {sub.project.title}
                   </strong>

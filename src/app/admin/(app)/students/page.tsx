@@ -38,7 +38,7 @@ export default async function StudentsPage() {
       <div style={styles.list}>
         {students.map((student) => (
           <Card key={student.id} padded={false}>
-            <a href={`/admin/students/${student.id}`} style={styles.row}>
+            <a href={`/students/${student.id}`} style={styles.row}>
               <div style={styles.main}>
                 <strong style={styles.name}>{student.name}</strong>
                 <span style={styles.email}>{student.email}</span>

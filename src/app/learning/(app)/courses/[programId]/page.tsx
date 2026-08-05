@@ -43,7 +43,7 @@ export default async function CourseDetailPage({
   return (
     <>
       <PageTitle title={program.title} lede={program.description}>
-        <BackLink href="/learning/courses" label="All courses" />
+        <BackLink href="/courses" label="All courses" />
       </PageTitle>
 
       <div style={{ marginTop: '1.5rem', maxWidth: 640 }}>
@@ -52,7 +52,7 @@ export default async function CourseDetailPage({
 
       {nextLesson ? (
         <p style={{ marginTop: '1rem' }}>
-          <a href={`/learning/lessons/${nextLesson.id}`} style={styles.cta}>
+          <a href={`/lessons/${nextLesson.id}`} style={styles.cta}>
             {done === 0 ? 'Start' : 'Continue'}: {nextLesson.title} →
           </a>
         </p>
@@ -95,7 +95,7 @@ export default async function CourseDetailPage({
                       const complete = completedIds.has(lesson.id);
                       return (
                         <li key={lesson.id}>
-                          <a href={`/learning/lessons/${lesson.id}`} style={styles.lessonLink}>
+                          <a href={`/lessons/${lesson.id}`} style={styles.lessonLink}>
                             <span
                               aria-hidden="true"
                               style={{ color: complete ? color.cyan : color.textFaint }}

@@ -36,7 +36,7 @@ export default async function ProjectDetailPage({
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <BackLink href="/learning/projects" label="All projects" />
+      <BackLink href="/projects" label="All projects" />
 
       <header style={styles.header}>
         <span style={styles.eyebrow}>{project.program.title}</span>

@@ -18,6 +18,7 @@ import { headers } from 'next/headers';
 import { db } from './db';
 import { createSession, destroySession, hashPassword, verifyPassword } from './auth';
 import { rateLimit } from './leads';
+import { tenantUrl } from './tenant';
 import type { FormState } from './form-state';
 
 /**
@@ -94,11 +95,19 @@ export async function signIn(
     role: user.role,
   });
 
-  // Role decides the destination, not the form that was submitted.
-  redirect(user.role === 'ADMIN' ? '/admin' : '/learning');
+  /*
+   * Role decides the destination, not the form that was submitted — and the two
+   * roles live on different hosts, so these are absolute URLs. A bare '/admin'
+   * would be rewritten by the proxy on whichever host the form was posted from
+   * and 404 (the prefix is internal); a bare '/' would keep a student who used
+   * the admin form stuck on the admin host.
+   */
+  redirect(await tenantUrl(user.role === 'ADMIN' ? 'admin' : 'learning'));
 }
 
 export async function signOut(): Promise<void> {
   await destroySession();
-  redirect('/learning/login');
+  // Same host the user signed out from — the session cookie is shared across
+  // subdomains, so there is no need to send them to the other tenant's form.
+  redirect('/login');
 }

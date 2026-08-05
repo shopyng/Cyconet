@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = { title: 'Dashboard' };
 
 export default async function StudentDashboard() {
-  const user = await verifySession('learning');
+  const user = await verifySession();
   const [enrollments, completedIds] = await Promise.all([
     myEnrollments(),
     myCompletedLessonIds(),
@@ -92,7 +92,7 @@ export default async function StudentDashboard() {
                   />
                 </ul>
 
-                <a href={`/learning/courses/${program.id}`} style={styles.link}>
+                <a href={`/courses/${program.id}`} style={styles.link}>
                   Continue →
                 </a>
               </article>

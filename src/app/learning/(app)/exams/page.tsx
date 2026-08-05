@@ -66,7 +66,7 @@ export default async function ExamsPage() {
               {exam.questions.length === 0 ? (
                 <p style={styles.blocked}>This exam has no questions yet.</p>
               ) : (
-                <a href={`/learning/exams/${exam.id}`} style={styles.link}>
+                <a href={`/exams/${exam.id}`} style={styles.link}>
                   {attempt ? (attempt.passed ? 'Retake exam' : 'Try again') : 'Start exam'} →
                 </a>
               )}

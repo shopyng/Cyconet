@@ -88,7 +88,7 @@ export default async function CertificatesPage() {
               {issued.map((certificate) => (
                 <li key={certificate.id} style={styles.plainItem}>
                   <div style={styles.certMain}>
-                    <a href={`/admin/students/${certificate.userId}`} style={styles.link}>
+                    <a href={`/students/${certificate.userId}`} style={styles.link}>
                       {certificate.user.name}
                     </a>
                     <span style={styles.sub}>{certificate.program.title}</span>

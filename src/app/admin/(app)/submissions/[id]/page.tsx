@@ -33,12 +33,12 @@ export default async function SubmissionDetailPage({
   return (
     <div style={{ maxWidth: 760 }}>
       <PageTitle title={submission.project.title}>
-        <BackLink href="/admin/submissions" label="Review queue" />
+        <BackLink href="/submissions" label="Review queue" />
       </PageTitle>
 
       <div style={styles.headMeta}>
         <Badge tone={statusTone(submission.status)}>{humanStatus(submission.status)}</Badge>
-        <a href={`/admin/students/${submission.user.id}`} style={styles.link}>
+        <a href={`/students/${submission.user.id}`} style={styles.link}>
           {submission.user.name}
         </a>
         <span style={styles.faint}>{formatDateTime(submission.submittedAt)}</span>

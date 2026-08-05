@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: 'Certificate' };
  * staff see otherwise.
  */
 export default async function CertificatePage() {
-  const user = await verifySession('learning');
+  const user = await verifySession();
   const [enrollments, certificates] = await Promise.all([myEnrollments(), myCertificates()]);
 
   if (enrollments.length === 0) {

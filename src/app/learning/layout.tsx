@@ -7,6 +7,9 @@ import type { Metadata } from 'next';
  * `(app)` route group, which has its own layout doing that work — because this
  * layout also wraps /learning/login, and gating here would redirect the login
  * page to itself forever.
+ *
+ * The marketing Navbar/Footer are suppressed for this tenant in the root
+ * layout, which reads the tenant from the proxy's header — see src/app/layout.tsx.
  */
 
 export const metadata: Metadata = {

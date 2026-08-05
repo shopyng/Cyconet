@@ -39,7 +39,7 @@ export default async function ExamPage({
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <BackLink href="/learning/exams" label="All exams" />
+      <BackLink href="/exams" label="All exams" />
 
       <header style={styles.header}>
         <span style={styles.eyebrow}>{exam.program.title}</span>

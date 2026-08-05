@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Sora, Inter } from 'next/font/google';
 import StyledJsxRegistry from './registry';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
 import { SITE_URL, brand } from '@/lib/content';
 import { jsonLdScript, keywords } from '@/lib/seo';
 import './globals.css';
@@ -116,14 +114,12 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: jsonLdScript() }}
         />
         {/*
-          Navbar, <main> and Footer live in the layout so every route gets the
-          same chrome and the skip link's #main target always exists.
+          Only the document shell lives here, so it stays shared by all three
+          tenants. The public site's Navbar/Footer are in (marketing)/layout.tsx
+          and the dashboards bring their own chrome via Shell — neither inherits
+          the other's furniture.
         */}
-        <StyledJsxRegistry>
-          <Navbar />
-          <main id="main">{children}</main>
-          <Footer />
-        </StyledJsxRegistry>
+        <StyledJsxRegistry>{children}</StyledJsxRegistry>
       </body>
     </html>
   );

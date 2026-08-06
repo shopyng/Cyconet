@@ -9,7 +9,7 @@ import {
   Section,
   formatWhen,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Timetable' };
@@ -96,7 +96,7 @@ export default async function AdminTimetablePage() {
             <ul style={styles.plainList}>
               {past.map((entry) => (
                 <li key={entry.id} style={styles.plainItem}>
-                  <span style={{ color: color.textMuted }}>{entry.title}</span>
+                  <span style={{ color: 'var(--textMuted)' }}>{entry.title}</span>
                   <span style={styles.faint}>{entry.programTitle}</span>
                   <span style={styles.right}>{formatWhen(entry.startTime, entry.endTime)}</span>
                 </li>
@@ -126,30 +126,30 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   title: {
     marginTop: '0.15rem',
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: '1.1rem',
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   desc: {
     marginTop: '0.5rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   meta: {
     marginTop: '0.4rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   muted: {
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   plainList: {
     display: 'flex',
@@ -167,10 +167,10 @@ const styles = {
     fontSize: font.small,
   },
   faint: {
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   right: {
     marginLeft: 'auto',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
 } satisfies Record<string, React.CSSProperties>;

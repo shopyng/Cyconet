@@ -8,7 +8,7 @@ import {
   humanStatus,
   formatDate,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Projects' };
@@ -63,6 +63,12 @@ export default async function ProjectsPage() {
 
               <p style={styles.desc}>{project.description}</p>
 
+              {project.rubricItems.length > 0 ? (
+                <p style={styles.meta}>
+                  Rubric: {project.rubricItems.reduce((sum, item) => sum + item.points, 0)} points
+                </p>
+              ) : null}
+
               {submission ? (
                 <p style={styles.meta}>
                   Submitted {formatDate(submission.submittedAt)}
@@ -98,30 +104,30 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   title: {
     marginTop: '0.15rem',
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: font.h3,
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   desc: {
     marginTop: '0.5rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   meta: {
     marginTop: '0.5rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   link: {
     display: 'inline-block',
     marginTop: '1.1rem',
-    color: color.cyan,
+    color: 'var(--primary)',
     fontSize: font.small,
     fontWeight: 500,
     textDecoration: 'none',

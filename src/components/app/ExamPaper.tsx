@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { useActionState } from 'react';
 import { IDLE_STATE, type FormState } from '@/lib/form-state';
 import { FormStatus } from '@/components/forms/Field';
-import { color, ease, font, glass, radius } from '@/lib/theme';
+import { ease, font, radius } from '@/lib/theme';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 
@@ -115,10 +115,10 @@ export default function ExamPaper({
           align-items: flex-start;
           gap: 0.7rem;
           padding: 0.75rem 0.9rem;
-          border: 1px solid ${color.border};
+          border: 1px solid var(--border);
           border-radius: ${radius.md}px;
-          background: rgba(255, 255, 255, 0.02);
-          color: ${color.textMuted};
+          background: var(--surface);
+          color: ${'var(--textMuted)'};
           font-size: 0.94rem;
           line-height: 1.5;
           cursor: pointer;
@@ -129,45 +129,45 @@ export default function ExamPaper({
         }
 
         .opt:hover {
-          border-color: ${color.borderStrong};
-          background: rgba(255, 255, 255, 0.04);
-          color: ${color.text};
+          border-color: var(--borderStrong);
+          background: var(--surfaceHover);
+          color: ${'var(--text)'};
         }
 
         /* :has() lets the whole row respond to its radio — no JS state needed. */
         .opt:has(input:checked) {
-          border-color: rgba(0, 229, 255, 0.45);
-          background: rgba(0, 229, 255, 0.08);
-          color: ${color.text};
+          border-color: var(--primary);
+          background: var(--primarySoft);
+          color: ${'var(--text)'};
         }
 
         .opt:has(input:focus-visible) {
-          outline: 2px solid ${color.cyan};
+          outline: 2px solid ${'var(--primary)'};
           outline-offset: 2px;
         }
 
         .opt input {
           margin: 0.2rem 0 0;
-          accent-color: ${color.cyan};
+          accent-color: ${'var(--primary)'};
         }
 
         .opt-letter {
           flex: none;
           min-width: 1.1rem;
-          color: ${color.textFaint};
+          color: ${'var(--textFaint)'};
           font-weight: 600;
         }
 
         .opt:has(input:checked) .opt-letter {
-          color: ${color.cyan};
+          color: ${'var(--primary)'};
         }
 
         .submit {
           padding: 0.75rem 1.4rem;
-          border: 1px solid rgba(0, 229, 255, 0.35);
+          border: 1px solid var(--primary);
           border-radius: ${radius.md}px;
-          background: rgba(0, 229, 255, 0.1);
-          color: ${color.cyan};
+          background: var(--primary);
+          color: #fff;
           font-family: inherit;
           font-size: 0.95rem;
           font-weight: 600;
@@ -178,8 +178,8 @@ export default function ExamPaper({
         }
 
         .submit:hover:not(:disabled) {
-          background: rgba(0, 229, 255, 0.16);
-          border-color: rgba(0, 229, 255, 0.5);
+          background: var(--primaryHover);
+          border-color: var(--primaryHover);
         }
 
         .submit:disabled {
@@ -207,9 +207,10 @@ const styles = {
     listStyle: 'none',
   },
   question: {
-    ...glass,
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
     padding: '1.25rem',
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
   },
   fieldset: {
     border: 0,
@@ -227,10 +228,10 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   qText: {
-    color: color.text,
+    color: 'var(--text)',
     fontSize: font.bodyLg,
     lineHeight: 1.5,
   },
@@ -247,13 +248,13 @@ const styles = {
   },
   footNote: {
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   afterPass: {
     marginTop: '0.5rem',
   },
   link: {
-    color: color.cyan,
+    color: 'var(--primary)',
     fontSize: font.small,
     textDecoration: 'none',
   },

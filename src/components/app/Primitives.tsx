@@ -5,12 +5,12 @@
  * bundle. Anything needing state (forms, toggles) lives in its own 'use client'
  * file instead.
  *
- * Styling follows the house split: geometry in the `styles` object, and the
- * few hover states that exist in styled-jsx, because an inline style can never
- * be overridden by a stylesheet `:hover` rule.
+ * Colours are CSS custom properties, set per-request by the tenant layout from
+ * the user's theme cookie — so one set of components serves both light and dark
+ * rather than two parallel style objects that can drift apart.
  */
 
-import { color, font, glass, radius } from '@/lib/theme';
+import { font, radius } from '@/lib/theme';
 
 /* ------------------------------------------------------------------ *
  * Page furniture
@@ -97,14 +97,17 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
 
 export type BadgeTone = 'neutral' | 'positive' | 'warning' | 'critical' | 'accent';
 
+/**
+ * Badge skins. Each pairs a tinted background with its own foreground from the
+ * theme, so the same tone stays legible whether the surface behind it is white
+ * or near-black.
+ */
 const TONES: Record<BadgeTone, React.CSSProperties> = {
-  neutral: { background: 'rgba(255,255,255,0.06)', color: color.textMuted },
-  positive: { background: 'rgba(0,229,255,0.10)', color: color.cyan },
-  // #FCD34D rather than a saturated amber: mid-tone yellows fall under 4.5:1
-  // on this background and fail AA for the small text a badge uses.
-  warning: { background: 'rgba(252,211,77,0.10)', color: '#FCD34D' },
-  critical: { background: 'rgba(252,165,165,0.10)', color: '#FCA5A5' },
-  accent: { background: 'rgba(129,140,248,0.12)', color: color.violetSoft },
+  neutral: { background: 'var(--surfaceHover)', color: 'var(--textMuted)' },
+  positive: { background: 'var(--successSoft)', color: 'var(--success)' },
+  warning: { background: 'var(--warningSoft)', color: 'var(--warning)' },
+  critical: { background: 'var(--dangerSoft)', color: 'var(--danger)' },
+  accent: { background: 'var(--primarySoft)', color: 'var(--primary)' },
 };
 
 export function Badge({
@@ -189,6 +192,56 @@ export function DetailList({ children }: { children: React.ReactNode }) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Dashboard stats
+ * ------------------------------------------------------------------ */
+
+/** Responsive row of stat tiles — wraps rather than scrolling on narrow screens. */
+export function StatGrid({ children }: { children: React.ReactNode }) {
+  return <div style={styles.statGrid}>{children}</div>;
+}
+
+/**
+ * A single headline number.
+ *
+ * Renders as a link when `href` is given, so the tile itself is the target
+ * rather than a separate "view" affordance next to it. The label comes before
+ * the value in the DOM so a screen reader hears what the number means first.
+ */
+export function StatTile({
+  label,
+  value,
+  hint,
+  href,
+}: {
+  label: string;
+  value: React.ReactNode;
+  /** Optional context under the number, e.g. "3 awaiting review". */
+  hint?: string;
+  href?: string;
+}) {
+  const body = (
+    <>
+      <span style={styles.statLabel}>{label}</span>
+      <span style={styles.statValue}>{value}</span>
+      {hint ? <span style={styles.statHint}>{hint}</span> : null}
+    </>
+  );
+
+  return href ? (
+    /*
+     * `stat-tile-link` carries the hover skin from globals.css rather than
+     * styled-jsx: this is a Server Component, and styled-jsx needs a client
+     * boundary. An inline style could not express `:hover` either way.
+     */
+    <a href={href} style={styles.statTile} className="stat-tile-link">
+      {body}
+    </a>
+  ) : (
+    <div style={styles.statTile}>{body}</div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * Dates
  * ------------------------------------------------------------------ */
 
@@ -236,14 +289,14 @@ const styles = {
   },
   h1: {
     fontFamily: 'var(--font-display), system-ui, sans-serif',
-    fontSize: font.display2,
+    fontSize: 'clamp(1.5rem, 1.3rem + 0.9vw, 2rem)',
     fontWeight: 700,
-    letterSpacing: '-0.03em',
-    color: color.text,
+    letterSpacing: '-0.02em',
+    color: 'var(--text)',
   },
   lede: {
     marginTop: '0.4rem',
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   headerActions: {
     display: 'flex',
@@ -251,7 +304,7 @@ const styles = {
     gap: '0.75rem',
   },
   backLink: {
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     fontSize: font.small,
     textDecoration: 'none',
   },
@@ -260,38 +313,41 @@ const styles = {
   },
   h2: {
     fontFamily: 'var(--font-display), system-ui, sans-serif',
-    fontSize: font.h3,
+    fontSize: '1.15rem',
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   sectionDesc: {
     marginTop: '0.3rem',
     marginBottom: '0.9rem',
     fontSize: font.small,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   card: {
-    ...glass,
-    borderRadius: radius.lg,
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: radius.md,
   },
   cardPadded: {
     padding: '1.25rem',
   },
   empty: {
-    ...glass,
-    padding: '2rem 1.5rem',
-    borderRadius: radius.lg,
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    padding: '2.5rem 1.5rem',
+    borderRadius: radius.md,
     textAlign: 'center',
   },
   emptyTitle: {
     display: 'block',
-    color: color.text,
+    color: 'var(--text)',
     fontSize: font.bodyLg,
+    fontWeight: 600,
   },
   emptyBody: {
     maxWidth: 460,
     margin: '0.5rem auto 0',
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     fontSize: font.small,
     lineHeight: 1.6,
   },
@@ -305,21 +361,21 @@ const styles = {
     whiteSpace: 'nowrap',
   },
   track: {
-    height: 6,
+    height: 8,
     marginTop: '1rem',
     borderRadius: 999,
-    background: 'rgba(255,255,255,0.08)',
+    background: 'var(--surfaceHover)',
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
     borderRadius: 999,
-    background: `linear-gradient(90deg, ${color.cyan}, ${color.violetSoft})`,
+    background: 'var(--primary)',
   },
   pct: {
     marginTop: '0.5rem',
     fontSize: font.small,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   detailList: {
     display: 'flex',
@@ -336,13 +392,47 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   detailValue: {
     margin: 0,
-    color: color.text,
+    color: 'var(--text)',
     fontSize: font.small,
     lineHeight: 1.6,
     overflowWrap: 'anywhere',
+  },
+  statGrid: {
+    display: 'grid',
+    gap: '0.85rem',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+  },
+  statTile: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.3rem',
+    padding: '1.1rem 1.15rem',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: radius.md,
+    textDecoration: 'none',
+  },
+  statLabel: {
+    fontSize: font.eyebrow,
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    color: 'var(--textFaint)',
+  },
+  statValue: {
+    fontFamily: 'var(--font-display), system-ui, sans-serif',
+    fontSize: '1.9rem',
+    fontWeight: 700,
+    lineHeight: 1.1,
+    letterSpacing: '-0.02em',
+    color: 'var(--text)',
+  },
+  statHint: {
+    fontSize: font.small,
+    color: 'var(--textMuted)',
   },
 } satisfies Record<string, React.CSSProperties>;

@@ -11,9 +11,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { customAlphabet } from 'nanoid';
+import type { Prisma } from '@prisma/client';
 import { db } from './db';
 import { verifyAdmin, eligibility } from './dal';
 import { hashPassword } from './auth';
+import { sendEmail } from './leads';
 import type { FormState } from './form-state';
 
 /**
@@ -24,6 +26,61 @@ import type { FormState } from './form-state';
  * symbols is ~50 bits — not guessable by enumeration.
  */
 const verificationCode = customAlphabet('0123456789ABCDEFGHJKMNPQRSTVWXYZ', 10);
+
+function superAdmins(): Set<string> {
+  return new Set(
+    (process.env.SUPER_ADMIN_EMAILS ?? '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+async function verifySuperAdmin() {
+  const admin = await verifyAdmin();
+  const allowed = superAdmins();
+  if (allowed.size > 0 && !allowed.has(admin.email.toLowerCase())) {
+    throw new Error('Forbidden');
+  }
+  return admin;
+}
+
+function fieldValue(formData: FormData, name: string): string {
+  return String(formData.get(name) ?? '').trim();
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+async function audit(
+  actorId: string,
+  action: string,
+  entity: string,
+  entityId?: string,
+  metadata?: Prisma.InputJsonObject,
+) {
+  await db.auditLog.create({
+    data: { actorId, action, entity, entityId, metadata: metadata ?? undefined },
+  });
+}
+
+async function notifyUser(userId: string, title: string, body: string, href?: string) {
+  await db.notification.create({ data: { userId, title, body, href } });
+}
+
+async function tryEmail(to: string, subject: string, text: string) {
+  try {
+    await sendEmail({ to, subject, text });
+  } catch (error) {
+    console.error('[email] workflow email failed:', error);
+  }
+}
 
 /* ------------------------------------------------------------------ *
  * Applications
@@ -75,6 +132,12 @@ export async function reviewApplication(
         reviewNotes: notes || null,
       },
     });
+    await audit(admin.id, 'application.rejected', 'Application', id, { email: application.email });
+    await tryEmail(
+      application.email,
+      'Cyconet application update',
+      `Hello ${application.name},\n\nThank you for applying to Cyconet. After review, we are unable to offer a place for this track right now.\n\n${notes ? `Notes from admissions:\n${notes}\n\n` : ''}Regards,\nCyconet Admissions`,
+    );
     revalidatePath('/admin', 'layout');
     return { status: 'success', message: 'Application rejected.' };
   }
@@ -129,9 +192,36 @@ export async function reviewApplication(
         reviewNotes: notes || null,
       },
     });
+
+    await tx.notification.create({
+      data: {
+        userId: student.id,
+        title: 'Application accepted',
+        body: `You have been enrolled on ${program.title}.`,
+        href: '/courses',
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: 'application.accepted',
+        entity: 'Application',
+        entityId: id,
+        metadata: { email, programId: program.id },
+      },
+    });
   });
 
   revalidatePath('/admin', 'layout');
+
+  await tryEmail(
+    email,
+    'Your Cyconet application was accepted',
+    issuedPassword
+      ? `Hello ${application.name},\n\nYour application for ${program.title} has been accepted.\n\nLogin: ${email}\nTemporary password: ${issuedPassword}\n\nSign in at the Cyconet learning portal and change your password when instructed.\n\nRegards,\nCyconet Admissions`
+      : `Hello ${application.name},\n\nYour application for ${program.title} has been accepted and added to your existing Cyconet account.\n\nRegards,\nCyconet Admissions`,
+  );
 
   return {
     status: 'success',
@@ -150,7 +240,7 @@ export async function reviewSubmission(
   _prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await verifyAdmin();
+  const admin = await verifyAdmin();
   const id = String(formData.get('id') ?? '');
   const decision = String(formData.get('decision') ?? '');
   const feedback = String(formData.get('feedback') ?? '').trim();
@@ -161,7 +251,10 @@ export async function reviewSubmission(
 
   const submission = await db.projectSubmission.findUnique({
     where: { id },
-    select: { id: true },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      project: { select: { title: true } },
+    },
   });
   if (!submission) {
     return { status: 'error', message: 'That submission does not exist.' };
@@ -177,17 +270,60 @@ export async function reviewSubmission(
     };
   }
 
-  await db.projectSubmission.update({
-    where: { id },
-    data: {
-      status: decision,
-      feedback: feedback || null,
-      reviewedAt: new Date(),
-    },
+  await db.$transaction(async (tx) => {
+    await tx.projectSubmission.update({
+      where: { id },
+      data: {
+        status: decision,
+        feedback: feedback || null,
+        reviewedAt: new Date(),
+      },
+    });
+
+    if (feedback) {
+      await tx.projectFeedback.create({
+        data: {
+          submissionId: id,
+          authorName: admin.name,
+          authorRole: admin.role,
+          body: feedback,
+        },
+      });
+    }
+
+    await tx.notification.create({
+      data: {
+        userId: submission.user.id,
+        title: decision === 'APPROVED' ? 'Project approved' : 'Project needs revision',
+        body:
+          decision === 'APPROVED'
+            ? `${submission.project.title} has been approved.`
+            : `${submission.project.title} needs revision. Check the reviewer feedback.`,
+        href: '/projects',
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: decision === 'APPROVED' ? 'submission.approved' : 'submission.revision_requested',
+        entity: 'ProjectSubmission',
+        entityId: id,
+        metadata: { student: submission.user.name, project: submission.project.title },
+      },
+    });
   });
 
   revalidatePath('/admin', 'layout');
   revalidatePath('/learning', 'layout');
+
+  await tryEmail(
+    submission.user.email,
+    decision === 'APPROVED' ? 'Cyconet project approved' : 'Cyconet project needs revision',
+    decision === 'APPROVED'
+      ? `Hello ${submission.user.name},\n\nYour project "${submission.project.title}" has been approved.\n\nRegards,\nCyconet`
+      : `Hello ${submission.user.name},\n\nYour project "${submission.project.title}" needs revision.\n\nFeedback:\n${feedback}\n\nRegards,\nCyconet`,
+  );
 
   return {
     status: 'success',
@@ -212,7 +348,7 @@ export async function issueCertificate(
   _prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await verifyAdmin();
+  const admin = await verifyAdmin();
   const userId = String(formData.get('userId') ?? '');
   const programId = String(formData.get('programId') ?? '');
 
@@ -221,7 +357,7 @@ export async function issueCertificate(
   }
 
   const [student, program, existing] = await Promise.all([
-    db.user.findUnique({ where: { id: userId }, select: { id: true, name: true } }),
+    db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true } }),
     db.program.findUnique({ where: { id: programId }, select: { id: true, title: true } }),
     db.certificate.findUnique({
       where: { userId_programId: { userId, programId } },
@@ -254,9 +390,26 @@ export async function issueCertificate(
   const certificate = await db.certificate.create({
     data: { userId, programId, verificationCode: verificationCode() },
   });
+  await notifyUser(
+    userId,
+    'Certificate issued',
+    `Your certificate for ${program.title} is ready.`,
+    '/certificate',
+  );
+  await audit(admin.id, 'certificate.issued', 'Certificate', certificate.id, {
+    userId,
+    programId,
+    verificationCode: certificate.verificationCode,
+  });
 
   revalidatePath('/admin', 'layout');
   revalidatePath('/learning', 'layout');
+
+  await tryEmail(
+    student.email,
+    'Your Cyconet certificate is ready',
+    `Hello ${student.name},\n\nYour certificate for ${program.title} has been issued.\n\nVerification code: ${certificate.verificationCode}\n\nRegards,\nCyconet`,
+  );
 
   return {
     status: 'success',
@@ -280,7 +433,7 @@ export async function createTimetableEntry(
   _prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await verifyAdmin();
+  const admin = await verifyAdmin();
 
   const programId = String(formData.get('programId') ?? '');
   const title = String(formData.get('title') ?? '').trim();
@@ -323,6 +476,11 @@ export async function createTimetableEntry(
       endTime: end as Date,
     },
   });
+  await audit(admin.id, 'timetable.created', 'TimetableEntry', undefined, {
+    programId,
+    title,
+    startTime: start?.toISOString(),
+  });
 
   revalidatePath('/admin', 'layout');
   revalidatePath('/learning', 'layout');
@@ -335,7 +493,7 @@ export async function deleteTimetableEntry(
   _prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await verifyAdmin();
+  const admin = await verifyAdmin();
   const id = String(formData.get('id') ?? '');
 
   if (!id) return { status: 'error', message: 'Missing entry.' };
@@ -347,9 +505,254 @@ export async function deleteTimetableEntry(
   if (!entry) return { status: 'error', message: 'That entry does not exist.' };
 
   await db.timetableEntry.delete({ where: { id } });
+  await audit(admin.id, 'timetable.deleted', 'TimetableEntry', id, { title: entry.title });
 
   revalidatePath('/admin', 'layout');
   revalidatePath('/learning', 'layout');
 
   return { status: 'success', message: `"${entry.title}" removed.` };
+}
+
+/* ------------------------------------------------------------------ *
+ * Curriculum authoring
+ * ------------------------------------------------------------------ */
+
+export async function saveProgram(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifySuperAdmin();
+  const id = fieldValue(formData, 'id') || slugify(fieldValue(formData, 'title'));
+  const originalId = fieldValue(formData, 'originalId');
+  const title = fieldValue(formData, 'title');
+  const duration = fieldValue(formData, 'duration');
+  const description = fieldValue(formData, 'description');
+  const errors: Record<string, string> = {};
+
+  if (!id) errors.id = 'Enter a URL-safe programme ID.';
+  if (!title || title.length < 3) errors.title = 'Programme title is required.';
+  if (!duration) errors.duration = 'Duration is required.';
+  if (description.length < 30) errors.description = 'Description needs at least 30 characters.';
+  if (Object.keys(errors).length > 0) {
+    return { status: 'error', message: 'Please check the highlighted fields.', errors };
+  }
+
+  const existing = await db.program.findUnique({ where: { id } });
+  if (!originalId && existing) {
+    return { status: 'error', message: 'A programme with that ID already exists.', errors: { id: 'Choose a unique ID.' } };
+  }
+
+  const program = originalId
+    ? await db.program.update({ where: { id: originalId }, data: { title, duration, description } })
+    : await db.program.create({ data: { id, title, duration, description } });
+
+  await audit(admin.id, originalId ? 'program.updated' : 'program.created', 'Program', program.id);
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+  return { status: 'success', message: originalId ? 'Programme updated.' : 'Programme created.' };
+}
+
+export async function saveModule(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifySuperAdmin();
+  const id = fieldValue(formData, 'id');
+  const programId = fieldValue(formData, 'programId');
+  const title = fieldValue(formData, 'title');
+  const description = fieldValue(formData, 'description');
+  const order = Number(fieldValue(formData, 'order'));
+  const errors: Record<string, string> = {};
+
+  if (!programId) errors.programId = 'Missing programme.';
+  if (!title || title.length < 3) errors.title = 'Module title is required.';
+  if (description.length < 10) errors.description = 'Description needs at least 10 characters.';
+  if (!Number.isInteger(order) || order < 1) errors.order = 'Order must be 1 or higher.';
+  if (Object.keys(errors).length > 0) return { status: 'error', message: 'Please check the highlighted fields.', errors };
+
+  const savedModule = id
+    ? await db.module.update({ where: { id }, data: { title, description, order } })
+    : await db.module.create({ data: { programId, title, description, order } });
+
+  await audit(admin.id, id ? 'module.updated' : 'module.created', 'Module', savedModule.id, { programId });
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+  return { status: 'success', message: id ? 'Module updated.' : 'Module added.' };
+}
+
+export async function saveLesson(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifySuperAdmin();
+  const id = fieldValue(formData, 'id');
+  const moduleId = fieldValue(formData, 'moduleId');
+  const title = fieldValue(formData, 'title');
+  const content = fieldValue(formData, 'content');
+  const videoUrl = fieldValue(formData, 'videoUrl');
+  const resourceLabel = fieldValue(formData, 'resourceLabel');
+  const resourceUrl = fieldValue(formData, 'resourceUrl');
+  const order = Number(fieldValue(formData, 'order'));
+  const errors: Record<string, string> = {};
+
+  if (!moduleId) errors.moduleId = 'Missing module.';
+  if (!title || title.length < 3) errors.title = 'Lesson title is required.';
+  if (content.length < 20) errors.content = 'Lesson content needs at least 20 characters.';
+  if (!Number.isInteger(order) || order < 1) errors.order = 'Order must be 1 or higher.';
+  if ((resourceLabel && !resourceUrl) || (!resourceLabel && resourceUrl)) {
+    errors.resourceUrl = 'Provide both a resource label and URL.';
+  }
+  if (Object.keys(errors).length > 0) return { status: 'error', message: 'Please check the highlighted fields.', errors };
+
+  const lesson = id
+    ? await db.lesson.update({ where: { id }, data: { title, content, videoUrl: videoUrl || null, order } })
+    : await db.lesson.create({ data: { moduleId, title, content, videoUrl: videoUrl || null, order } });
+
+  if (resourceLabel && resourceUrl) {
+    await db.lessonResource.create({ data: { lessonId: lesson.id, label: resourceLabel, url: resourceUrl } });
+  }
+
+  await audit(admin.id, id ? 'lesson.updated' : 'lesson.created', 'Lesson', lesson.id, { moduleId });
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+  return { status: 'success', message: id ? 'Lesson updated.' : 'Lesson added.' };
+}
+
+export async function saveExam(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifySuperAdmin();
+  const id = fieldValue(formData, 'id');
+  const programId = fieldValue(formData, 'programId');
+  const title = fieldValue(formData, 'title');
+  const description = fieldValue(formData, 'description');
+  const passingScore = Number(fieldValue(formData, 'passingScore'));
+  const errors: Record<string, string> = {};
+
+  if (!programId) errors.programId = 'Missing programme.';
+  if (!title || title.length < 3) errors.title = 'Exam title is required.';
+  if (description.length < 10) errors.description = 'Description needs at least 10 characters.';
+  if (!Number.isInteger(passingScore) || passingScore < 1 || passingScore > 100) errors.passingScore = 'Pass mark must be 1-100.';
+  if (Object.keys(errors).length > 0) return { status: 'error', message: 'Please check the highlighted fields.', errors };
+
+  const exam = id
+    ? await db.exam.update({ where: { id }, data: { title, description, passingScore } })
+    : await db.exam.create({ data: { programId, title, description, passingScore } });
+
+  await audit(admin.id, id ? 'exam.updated' : 'exam.created', 'Exam', exam.id, { programId });
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+  return { status: 'success', message: id ? 'Exam updated.' : 'Exam added.' };
+}
+
+export async function saveQuestion(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifySuperAdmin();
+  const id = fieldValue(formData, 'id');
+  const examId = fieldValue(formData, 'examId');
+  const question = fieldValue(formData, 'question');
+  const options = ['A', 'B', 'C', 'D'].map((letter) => fieldValue(formData, `option${letter}`));
+  const correct = fieldValue(formData, 'correct').toUpperCase();
+  const order = Number(fieldValue(formData, 'order'));
+  const errors: Record<string, string> = {};
+
+  if (!examId) errors.examId = 'Missing exam.';
+  if (question.length < 10) errors.question = 'Question needs at least 10 characters.';
+  options.forEach((option, index) => {
+    if (!option) errors[`option${'ABCD'[index]}`] = 'Option is required.';
+  });
+  if (!['A', 'B', 'C', 'D'].includes(correct)) errors.correct = 'Correct answer must be A, B, C or D.';
+  if (!Number.isInteger(order) || order < 1) errors.order = 'Order must be 1 or higher.';
+  if (Object.keys(errors).length > 0) return { status: 'error', message: 'Please check the highlighted fields.', errors };
+
+  const saved = id
+    ? await db.examQuestion.update({ where: { id }, data: { question, options, correct, order } })
+    : await db.examQuestion.create({ data: { examId, question, options, correct, order } });
+
+  await audit(admin.id, id ? 'question.updated' : 'question.created', 'ExamQuestion', saved.id, { examId });
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+  return { status: 'success', message: id ? 'Question updated.' : 'Question added.' };
+}
+
+export async function saveProject(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifySuperAdmin();
+  const id = fieldValue(formData, 'id');
+  const programId = fieldValue(formData, 'programId');
+  const title = fieldValue(formData, 'title');
+  const description = fieldValue(formData, 'description');
+  const requirements = fieldValue(formData, 'requirements');
+  const rubricLabel = fieldValue(formData, 'rubricLabel');
+  const rubricPoints = Number(fieldValue(formData, 'rubricPoints') || 0);
+  const errors: Record<string, string> = {};
+
+  if (!programId) errors.programId = 'Missing programme.';
+  if (!title || title.length < 3) errors.title = 'Project title is required.';
+  if (description.length < 10) errors.description = 'Description needs at least 10 characters.';
+  if (requirements.length < 20) errors.requirements = 'Requirements need at least 20 characters.';
+  if (rubricLabel && (!Number.isInteger(rubricPoints) || rubricPoints < 1)) errors.rubricPoints = 'Rubric points must be 1 or higher.';
+  if (Object.keys(errors).length > 0) return { status: 'error', message: 'Please check the highlighted fields.', errors };
+
+  const project = id
+    ? await db.project.update({ where: { id }, data: { title, description, requirements } })
+    : await db.project.create({ data: { programId, title, description, requirements } });
+
+  if (rubricLabel) {
+    const count = await db.projectRubricItem.count({ where: { projectId: project.id } });
+    await db.projectRubricItem.create({
+      data: { projectId: project.id, label: rubricLabel, points: rubricPoints, order: count + 1 },
+    });
+  }
+
+  await audit(admin.id, id ? 'project.updated' : 'project.created', 'Project', project.id, { programId });
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+  return { status: 'success', message: id ? 'Project updated.' : 'Project added.' };
+}
+
+export async function deleteCurriculumItem(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifySuperAdmin();
+  const type = fieldValue(formData, 'type');
+  const id = fieldValue(formData, 'id');
+
+  if (!id) return { status: 'error', message: 'Missing item.' };
+
+  if (type === 'question') {
+    await db.examQuestion.delete({ where: { id } });
+    await audit(admin.id, 'question.deleted', 'ExamQuestion', id);
+  } else if (type === 'lesson') {
+    await db.lesson.delete({ where: { id } });
+    await audit(admin.id, 'lesson.deleted', 'Lesson', id);
+  } else if (type === 'module') {
+    await db.module.delete({ where: { id } });
+    await audit(admin.id, 'module.deleted', 'Module', id);
+  } else if (type === 'exam') {
+    await db.exam.delete({ where: { id } });
+    await audit(admin.id, 'exam.deleted', 'Exam', id);
+  } else if (type === 'project') {
+    await db.project.delete({ where: { id } });
+    await audit(admin.id, 'project.deleted', 'Project', id);
+  } else if (type === 'program') {
+    const enrolled = await db.enrollment.count({ where: { programId: id } });
+    if (enrolled > 0) {
+      return { status: 'error', message: 'Cannot delete a programme with enrolled students.' };
+    }
+    await db.program.delete({ where: { id } });
+    await audit(admin.id, 'program.deleted', 'Program', id);
+  } else {
+    return { status: 'error', message: 'Unknown curriculum item.' };
+  }
+
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+  return { status: 'success', message: 'Deleted.' };
 }

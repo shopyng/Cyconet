@@ -22,7 +22,7 @@
  * dependency starts paying for itself.
  */
 
-import { color, font, radius } from '@/lib/theme';
+import { font, radius } from '@/lib/theme';
 
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -214,7 +214,7 @@ export function MarkdownStyles() {
 
 const CSS = `
   .cn-md {
-    color: ${color.textMuted};
+    color: ${'var(--textMuted)'};
     font-size: ${font.body};
     line-height: 1.75;
   }
@@ -225,7 +225,7 @@ const CSS = `
   .cn-md h5,
   .cn-md h6 {
     margin: 2rem 0 0.6rem;
-    color: ${color.text};
+    color: ${'var(--text)'};
     font-family: var(--font-display), system-ui, sans-serif;
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -249,23 +249,23 @@ const CSS = `
   }
 
   .cn-md li { margin-bottom: 0.35rem; }
-  .cn-md li::marker { color: ${color.textFaint}; }
+  .cn-md li::marker { color: ${'var(--textFaint)'}; }
 
   .cn-md strong {
-    color: ${color.text};
+    color: ${'var(--text)'};
     font-weight: 600;
   }
 
   .cn-md a {
-    color: ${color.cyan};
+    color: ${'var(--primary)'};
     text-underline-offset: 3px;
   }
 
   .cn-md code {
     padding: 0.12em 0.4em;
     border-radius: ${radius.sm}px;
-    background: rgba(255, 255, 255, 0.06);
-    color: ${color.cyanSoft};
+    background: var(--surfaceHover);
+    color: ${'var(--primaryHover)'};
     font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.88em;
   }
@@ -273,9 +273,9 @@ const CSS = `
   .cn-md pre {
     margin: 0 0 1.25rem;
     padding: 1rem 1.1rem;
-    border: 1px solid ${color.border};
+    border: 1px solid var(--border);
     border-radius: ${radius.md}px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--bgSoft);
     overflow-x: auto;
   }
 
@@ -283,7 +283,7 @@ const CSS = `
   .cn-md pre code {
     padding: 0;
     background: none;
-    color: ${color.text};
+    color: ${'var(--text)'};
     font-size: 0.85rem;
     line-height: 1.7;
   }
@@ -291,13 +291,13 @@ const CSS = `
   .cn-md blockquote {
     margin: 0 0 1rem;
     padding: 0.35rem 0 0.35rem 1rem;
-    border-left: 2px solid ${color.borderStrong};
-    color: ${color.textFaint};
+    border-left: 2px solid var(--borderStrong);
+    color: ${'var(--textFaint)'};
   }
 
   .cn-md hr {
     margin: 1.75rem 0;
     border: 0;
-    border-top: 1px solid ${color.border};
+    border-top: 1px solid var(--border);
   }
 `;

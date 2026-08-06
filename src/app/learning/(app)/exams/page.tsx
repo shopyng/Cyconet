@@ -1,6 +1,6 @@
 import { myExams, myBestAttempts } from '@/lib/dal';
 import { PageTitle, Card, EmptyState, Badge } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Exams' };
@@ -95,35 +95,35 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   title: {
     marginTop: '0.15rem',
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: font.h3,
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   desc: {
     marginTop: '0.5rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   meta: {
     marginTop: '0.5rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   blocked: {
     marginTop: '1rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   link: {
     display: 'inline-block',
     marginTop: '1.1rem',
-    color: color.cyan,
+    color: 'var(--primary)',
     fontSize: font.small,
     fontWeight: 500,
     textDecoration: 'none',

@@ -1,6 +1,6 @@
 import { myEnrollments, myCompletedLessonIds } from '@/lib/dal';
 import { PageTitle, Card, EmptyState, ProgressBar, Badge } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Courses' };
@@ -96,22 +96,22 @@ const styles = {
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: font.h3,
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   desc: {
     marginTop: '0.6rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   meta: {
     marginTop: '0.35rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   link: {
     marginTop: '1.1rem',
-    color: color.cyan,
+    color: 'var(--primary)',
     fontSize: font.small,
     fontWeight: 500,
     textDecoration: 'none',

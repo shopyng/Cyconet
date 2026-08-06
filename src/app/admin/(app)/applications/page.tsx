@@ -9,7 +9,7 @@ import {
   humanStatus,
   formatDate,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Applications' };
@@ -127,11 +127,11 @@ const styles = {
     minWidth: 0,
   },
   name: {
-    color: color.text,
+    color: 'var(--text)',
   },
   email: {
     fontSize: font.small,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     overflowWrap: 'anywhere',
   },
   rowMeta: {
@@ -142,10 +142,10 @@ const styles = {
   },
   track: {
     fontSize: font.small,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   date: {
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
 } satisfies Record<string, React.CSSProperties>;

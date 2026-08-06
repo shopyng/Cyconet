@@ -3,7 +3,7 @@ import { examForStudent, myAttemptsForExam } from '@/lib/dal';
 import { submitExam } from '@/lib/learning-actions';
 import ExamPaper, { type PaperQuestion } from '@/components/app/ExamPaper';
 import { BackLink, Badge, EmptyState, Section, formatDateTime } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Exam' };
@@ -84,7 +84,7 @@ export default async function ExamPage({
           <ul style={styles.attempts}>
             {attempts.map((attempt) => (
               <li key={attempt.id} style={styles.attempt}>
-                <span style={{ color: color.text }}>{attempt.score}%</span>
+                <span style={{ color: 'var(--text)' }}>{attempt.score}%</span>
                 <Badge tone={attempt.passed ? 'positive' : 'critical'}>
                   {attempt.passed ? 'Pass' : 'Fail'}
                 </Badge>
@@ -106,7 +106,7 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   h1: {
     marginTop: '0.3rem',
@@ -115,11 +115,11 @@ const styles = {
     fontWeight: 700,
     letterSpacing: '-0.03em',
     lineHeight: 1.15,
-    color: color.text,
+    color: 'var(--text)',
   },
   desc: {
     marginTop: '0.6rem',
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     lineHeight: 1.6,
   },
   meta: {
@@ -131,7 +131,7 @@ const styles = {
   },
   metaText: {
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   attempts: {
     display: 'flex',
@@ -146,11 +146,11 @@ const styles = {
     alignItems: 'center',
     gap: '0.75rem',
     padding: '0.6rem 0',
-    borderBottom: `1px solid ${color.border}`,
+    borderBottom: `1px solid var(--border)`,
     fontSize: font.small,
   },
   attemptDate: {
     marginLeft: 'auto',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
 } satisfies Record<string, React.CSSProperties>;

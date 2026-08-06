@@ -21,6 +21,8 @@ html {
   scroll-padding-top: 90px;
   color-scheme: dark;
   -webkit-text-size-adjust: 100%;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: Sora, Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 body {
@@ -113,6 +115,26 @@ ol {
 *::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.28);
   background-clip: content-box;
+}
+
+/*
+ * Dashboard hover skins.
+ *
+ * These live here rather than in the component because the primitives in
+ * src/components/app/Primitives.tsx are Server Components — styled-jsx needs a
+ * client boundary, and an inline style cannot express `:hover` at all. The
+ * custom properties are set per-request by the tenant layout from the user's
+ * theme cookie, so one rule covers light and dark.
+ */
+.stat-tile-link {
+  transition:
+    border-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-tile-link:hover {
+  border-color: var(--borderStrong);
+  background: var(--surfaceHover);
 }
 
 /*

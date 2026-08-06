@@ -9,7 +9,7 @@ import {
   ProgressBar,
   formatDate,
 } from '@/components/app/Primitives';
-import { color, font, gradient, radius } from '@/lib/theme';
+import { font, radius } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Certificate' };
@@ -171,7 +171,7 @@ const styles = {
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: font.h3,
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   gates: {
     display: 'flex',
@@ -186,32 +186,33 @@ const styles = {
     fontSize: font.small,
   },
   gateLabel: {
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   gateCount: {
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   note: {
     marginTop: '1.1rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   certificate: {
     position: 'relative',
     padding: 'clamp(1.5rem, 1rem + 2vw, 2.25rem)',
     // A brand-gradient hairline reads as "document" without the cost of a real
     // certificate render — this page is the record, not a printable artefact.
-    border: `1px solid ${color.borderStrong}`,
+    border: `1px solid var(--borderStrong)`,
     borderRadius: radius.lg,
-    background: `linear-gradient(180deg, rgba(0,229,255,0.05), rgba(124,58,237,0.04))`,
+    background: 'var(--surface)',
+    boxShadow: '0 18px 44px rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
   },
   certEyebrow: {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.14em',
-    color: color.cyan,
+    color: 'var(--primary)',
   },
   certTitle: {
     marginTop: '0.5rem',
@@ -219,14 +220,11 @@ const styles = {
     fontSize: font.h3,
     fontWeight: 700,
     letterSpacing: '-0.02em',
-    background: gradient.brand,
-    WebkitBackgroundClip: 'text',
-    backgroundClip: 'text',
-    color: 'transparent',
+    color: 'var(--primary)',
   },
   certHolder: {
     marginTop: '0.35rem',
-    color: color.text,
+    color: 'var(--text)',
     fontSize: font.bodyLg,
   },
   certMeta: {
@@ -239,23 +237,23 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   certValue: {
     margin: '0.2rem 0 0',
     fontSize: font.small,
-    color: color.text,
+    color: 'var(--text)',
   },
   verify: {
     marginTop: '1.5rem',
     paddingTop: '1rem',
-    borderTop: `1px solid ${color.border}`,
+    borderTop: `1px solid var(--border)`,
     fontSize: font.small,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     overflowWrap: 'anywhere',
   },
   verifyLink: {
-    color: color.cyan,
+    color: 'var(--primary)',
     textDecoration: 'none',
   },
 } satisfies Record<string, React.CSSProperties>;

@@ -7,7 +7,7 @@ import {
   Section,
   formatWhen,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Timetable' };
@@ -77,7 +77,7 @@ export default async function TimetablePage() {
                 <div style={styles.head}>
                   <div style={{ minWidth: 0 }}>
                     <span style={styles.eyebrow}>{entry.programTitle}</span>
-                    <h3 style={{ ...styles.title, color: color.textMuted }}>{entry.title}</h3>
+                    <h3 style={{ ...styles.title, color: 'var(--textMuted)' }}>{entry.title}</h3>
                   </div>
                   <Badge tone="neutral">{formatWhen(entry.startTime, entry.endTime)}</Badge>
                 </div>
@@ -108,24 +108,24 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   title: {
     marginTop: '0.15rem',
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: '1.1rem',
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   desc: {
     marginTop: '0.5rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   meta: {
     marginTop: '0.4rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
 } satisfies Record<string, React.CSSProperties>;

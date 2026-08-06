@@ -14,7 +14,7 @@ import {
   humanStatus,
   formatDateTime,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Application' };
@@ -107,11 +107,11 @@ export default async function ApplicationDetailPage({
 
 const styles = {
   link: {
-    color: color.cyan,
+    color: 'var(--primary)',
     textDecoration: 'none',
   },
   motivation: {
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     fontSize: font.small,
     lineHeight: 1.75,
     whiteSpace: 'pre-wrap',

@@ -14,7 +14,7 @@ import {
   formatDate,
   formatDateTime,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Student' };
@@ -127,7 +127,7 @@ export default async function StudentDetailPage({
             <ul style={styles.plainList}>
               {student.certificates.map((certificate) => (
                 <li key={certificate.id} style={styles.plainItem}>
-                  <span style={{ color: color.text }}>{certificate.program.title}</span>
+                  <span style={{ color: 'var(--text)' }}>{certificate.program.title}</span>
                   <span style={styles.code}>{certificate.verificationCode}</span>
                   <span style={styles.right}>{formatDate(certificate.issuedAt)}</span>
                 </li>
@@ -143,7 +143,7 @@ export default async function StudentDetailPage({
             <ul style={styles.plainList}>
               {student.examAttempts.map((attempt) => (
                 <li key={attempt.id} style={styles.plainItem}>
-                  <span style={{ color: color.text }}>{attempt.exam.title}</span>
+                  <span style={{ color: 'var(--text)' }}>{attempt.exam.title}</span>
                   <Badge tone={attempt.passed ? 'positive' : 'critical'}>
                     {attempt.score}%
                   </Badge>
@@ -182,8 +182,8 @@ function Gate({ label, done, total }: { label: string; done: number; total: numb
   return (
     <div>
       <div style={styles.gateHead}>
-        <span style={{ color: color.textMuted }}>{label}</span>
-        <span style={{ color: color.textFaint }}>
+        <span style={{ color: 'var(--textMuted)' }}>{label}</span>
+        <span style={{ color: 'var(--textFaint)' }}>
           {done}/{total}
         </span>
       </div>
@@ -196,7 +196,7 @@ const styles = {
   joined: {
     marginTop: '0.5rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   list: {
     display: 'flex',
@@ -213,12 +213,12 @@ const styles = {
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: font.h3,
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   since: {
     marginTop: '0.2rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   gates: {
     display: 'flex',
@@ -235,7 +235,7 @@ const styles = {
   muted: {
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   plainList: {
     display: 'flex',
@@ -256,14 +256,14 @@ const styles = {
     fontFamily: 'var(--font-mono), ui-monospace, monospace',
     fontSize: font.eyebrow,
     letterSpacing: '0.06em',
-    color: color.cyan,
+    color: 'var(--primary)',
   },
   right: {
     marginLeft: 'auto',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   link: {
-    color: color.cyan,
+    color: 'var(--primary)',
     textDecoration: 'none',
   },
 } satisfies Record<string, React.CSSProperties>;

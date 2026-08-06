@@ -9,7 +9,7 @@ import {
   Section,
   formatDate,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Certificates' };
@@ -124,18 +124,18 @@ const styles = {
     gap: '0.75rem',
   },
   name: {
-    color: color.text,
+    color: 'var(--text)',
   },
   sub: {
     marginTop: '0.15rem',
     fontSize: font.small,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     overflowWrap: 'anywhere',
   },
   muted: {
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   plainList: {
     display: 'flex',
@@ -158,18 +158,18 @@ const styles = {
     minWidth: 0,
   },
   link: {
-    color: color.cyan,
+    color: 'var(--primary)',
     textDecoration: 'none',
   },
   code: {
     fontFamily: 'var(--font-mono), ui-monospace, monospace',
     fontSize: font.eyebrow,
     letterSpacing: '0.06em',
-    color: color.cyanSoft,
+    color: 'var(--primaryHover)',
     textDecoration: 'none',
   },
   right: {
     marginLeft: 'auto',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
 } satisfies Record<string, React.CSSProperties>;

@@ -15,6 +15,7 @@
  */
 
 import { headers } from 'next/headers';
+import { revalidatePath } from 'next/cache';
 import {
   deliver,
   FALLBACK_MESSAGE,
@@ -24,6 +25,7 @@ import {
   type FormState,
 } from './leads';
 import { programs } from './content';
+import { db } from './db';
 
 const PROGRAM_IDS = programs.map((program) => program.id);
 const SERVICE_OPTIONS = [
@@ -95,19 +97,72 @@ export async function submitApplication(
   _prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  return handle(
-    'application',
-    formData,
-    [
-      { name: 'name', label: 'Full name', required: true, min: 2, max: 100 },
-      { name: 'email', label: 'Email', required: true, type: 'email', max: 160 },
-      { name: 'phone', label: 'Phone', required: true, type: 'phone' },
-      { name: 'track', label: 'Track', required: true, oneOf: PROGRAM_IDS },
-      { name: 'experience', label: 'Experience level', required: true, max: 60 },
-      { name: 'motivation', label: 'Motivation', required: true, min: 40, max: 1500 },
-    ],
-    'Application received. We will be in touch within five working days with your next step.',
-  );
+  const successMessage =
+    'Application received. We will be in touch within five working days with your next step.';
+
+  // Report success to bots so they get no signal that the trap fired.
+  if (isBot(formData)) {
+    return { status: 'success', message: successMessage };
+  }
+
+  if (!rateLimit(await clientKey())) {
+    return {
+      status: 'error',
+      message: 'Too many submissions in a short time. Please try again in a minute.',
+    };
+  }
+
+  const { values, errors } = validate(formData, [
+    { name: 'name', label: 'Full name', required: true, min: 2, max: 100 },
+    { name: 'email', label: 'Email', required: true, type: 'email', max: 160 },
+    { name: 'phone', label: 'Phone', required: true, type: 'phone' },
+    { name: 'track', label: 'Track', required: true, oneOf: PROGRAM_IDS },
+    { name: 'experience', label: 'Experience level', required: true, max: 60 },
+    { name: 'motivation', label: 'Motivation', required: true, min: 40, max: 1500 },
+  ]);
+
+  if (Object.keys(errors).length > 0) {
+    return {
+      status: 'error',
+      message: 'Please check the highlighted fields.',
+      errors,
+      values,
+    };
+  }
+
+  const email = values.email.toLowerCase();
+  const existingPending = await db.application.findFirst({
+    where: { email, track: values.track, status: 'PENDING' },
+    select: { id: true },
+  });
+
+  if (existingPending) {
+    return {
+      status: 'success',
+      message:
+        'Your application is already in review. We will be in touch within five working days with your next step.',
+    };
+  }
+
+  await db.application.create({
+    data: {
+      name: values.name,
+      email,
+      phone: values.phone,
+      track: values.track,
+      experience: values.experience,
+      motivation: values.motivation,
+    },
+  });
+  revalidatePath('/admin', 'layout');
+
+  try {
+    await deliver('application', values);
+  } catch (error) {
+    console.error('[leads] application notification failed:', error);
+  }
+
+  return { status: 'success', message: successMessage };
 }
 
 export async function submitEnquiry(

@@ -4,7 +4,7 @@ import { setLessonProgress } from '@/lib/learning-actions';
 import Markdown, { MarkdownStyles } from '@/components/app/Markdown';
 import { ActionButton } from '@/components/app/ActionForms';
 import { BackLink, Badge, Card } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Lesson' };
@@ -61,6 +61,21 @@ export default async function LessonPage({
             Watch the lesson video →
           </a>
         </p>
+      ) : null}
+
+      {lesson.resources.length > 0 ? (
+        <Card>
+          <h2 style={styles.actionTitle}>Resources</h2>
+          <ul style={styles.resources}>
+            {lesson.resources.map((resource) => (
+              <li key={resource.id}>
+                <a href={resource.url} target="_blank" rel="noopener noreferrer" style={styles.videoLink}>
+                  {resource.label} →
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Card>
       ) : null}
 
       <div style={styles.body}>
@@ -122,7 +137,7 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   h1: {
     marginTop: '0.3rem',
@@ -131,7 +146,7 @@ const styles = {
     fontWeight: 700,
     letterSpacing: '-0.03em',
     lineHeight: 1.15,
-    color: color.text,
+    color: 'var(--text)',
   },
   headerMeta: {
     display: 'flex',
@@ -141,13 +156,13 @@ const styles = {
   },
   position: {
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   video: {
     marginTop: '1.5rem',
   },
   videoLink: {
-    color: color.cyan,
+    color: 'var(--primary)',
     fontSize: font.small,
     fontWeight: 500,
     textDecoration: 'none',
@@ -155,17 +170,25 @@ const styles = {
   body: {
     margin: '2rem 0',
   },
+  resources: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.45rem',
+    margin: '0.8rem 0 0',
+    padding: 0,
+    listStyle: 'none',
+  },
   actionTitle: {
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: '1.05rem',
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   actionBody: {
     marginTop: '0.4rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   pager: {
     display: 'grid',
@@ -184,10 +207,10 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   pagerTitle: {
     fontSize: font.small,
-    color: color.cyan,
+    color: 'var(--primary)',
   },
 } satisfies Record<string, React.CSSProperties>;

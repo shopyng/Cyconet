@@ -130,6 +130,7 @@ export const lessonForStudent = cache(async (lessonId: string) => {
   const lesson = await db.lesson.findUnique({
     where: { id: lessonId },
     include: {
+      resources: { orderBy: { createdAt: 'asc' } },
       module: {
         include: {
           program: true,
@@ -248,7 +249,10 @@ export const myProjects = cache(async () => {
 
   return db.project.findMany({
     where: { programId: { in: enrollments.map((e) => e.programId) } },
-    include: { program: { select: { id: true, title: true } } },
+    include: {
+      program: { select: { id: true, title: true } },
+      rubricItems: { orderBy: { order: 'asc' } },
+    },
     orderBy: { title: 'asc' },
   });
 });
@@ -259,13 +263,17 @@ export const projectForStudent = cache(async (projectId: string) => {
 
   const project = await db.project.findUnique({
     where: { id: projectId },
-    include: { program: { select: { id: true, title: true } } },
+    include: {
+      program: { select: { id: true, title: true } },
+      rubricItems: { orderBy: { order: 'asc' } },
+    },
   });
   if (!project) return null;
   if (!(await isEnrolled(project.programId))) return null;
 
   const submissions = await db.projectSubmission.findMany({
     where: { userId: user.id, projectId },
+    include: { feedbackThread: { orderBy: { createdAt: 'asc' } } },
     orderBy: { submittedAt: 'desc' },
   });
 
@@ -515,10 +523,15 @@ export const allPrograms = cache(async () => {
     include: {
       modules: {
         orderBy: { order: 'asc' },
-        include: { lessons: { orderBy: { order: 'asc' } } },
+        include: {
+          lessons: {
+            orderBy: { order: 'asc' },
+            include: { resources: { orderBy: { createdAt: 'asc' } } },
+          },
+        },
       },
       exams: { include: { questions: { select: { id: true } } } },
-      projects: true,
+      projects: { include: { rubricItems: { orderBy: { order: 'asc' } } } },
       _count: { select: { enrollments: true } },
     },
     orderBy: { title: 'asc' },
@@ -533,10 +546,15 @@ export const programForAdmin = cache(async (programId: string) => {
     include: {
       modules: {
         orderBy: { order: 'asc' },
-        include: { lessons: { orderBy: { order: 'asc' } } },
+        include: {
+          lessons: {
+            orderBy: { order: 'asc' },
+            include: { resources: { orderBy: { createdAt: 'asc' } } },
+          },
+        },
       },
-      exams: { include: { questions: { select: { id: true } } } },
-      projects: true,
+      exams: { include: { questions: { orderBy: { order: 'asc' } } } },
+      projects: { include: { rubricItems: { orderBy: { order: 'asc' } } } },
       _count: { select: { enrollments: true } },
     },
   });
@@ -629,6 +647,53 @@ export const programOptions = cache(async () => {
     select: { id: true, title: true },
     orderBy: { title: 'asc' },
   });
+});
+
+export const opsOverview = cache(async () => {
+  await verifyAdmin();
+
+  const [
+    auditLogs,
+    notifications,
+    users,
+    applications,
+    enrollments,
+    certificates,
+    pendingReviews,
+    programmes,
+  ] = await Promise.all([
+    db.auditLog.findMany({
+      include: { actor: { select: { name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+    db.notification.findMany({
+      include: { user: { select: { name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+    db.user.count(),
+    db.application.count(),
+    db.enrollment.count(),
+    db.certificate.count(),
+    db.projectSubmission.count({ where: { status: 'PENDING' } }),
+    db.program.count(),
+  ]);
+
+  return {
+    auditLogs,
+    notifications,
+    metrics: { users, applications, enrollments, certificates, pendingReviews, programmes },
+    checks: {
+      database: true,
+      email: Boolean(process.env.RESEND_API_KEY && process.env.LEAD_FROM_EMAIL && process.env.LEAD_NOTIFY_EMAIL),
+      backups: Boolean(process.env.BACKUPS_VERIFIED_AT),
+      superAdmins: Boolean(process.env.SUPER_ADMIN_EMAILS),
+      siteUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
+      rootDomain: Boolean(process.env.NEXT_PUBLIC_ROOT_DOMAIN),
+      sessionSecret: Boolean(process.env.SESSION_SECRET && process.env.SESSION_SECRET !== 'dev-secret-change-in-production'),
+    },
+  };
 });
 
 /* ------------------------------------------------------------------ *

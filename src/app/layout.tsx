@@ -1,28 +1,14 @@
 import type { Metadata, Viewport } from 'next';
-import { Sora, Inter } from 'next/font/google';
 import StyledJsxRegistry from './registry';
 import { SITE_URL, brand } from '@/lib/content';
 import { jsonLdScript, keywords } from '@/lib/seo';
 import './globals.css';
 
 /**
- * Sora carries the oversized display headings — geometric, tight, with enough
- * character to feel branded. Inter handles body copy at small sizes where Sora
- * gets harder to read. Both are variable fonts, so a single file covers the
- * whole weight range.
+ * Font stacks are defined in globals.css rather than fetched from Google at
+ * build time. That keeps deployment deterministic in restricted/serverless
+ * environments where outbound font requests may fail.
  */
-const display = Sora({
-  subsets: ['latin'],
-  variable: '--font-display',
-  weight: ['600', '700', '800'],
-  display: 'swap',
-});
-
-const sans = Inter({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-});
 
 /**
  * The title leads with "Cybersecurity Academy" — the highest-intent term — then
@@ -70,8 +56,8 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: [{ url: '/cyconet-logo.svg', type: 'image/svg+xml' }],
-    apple: '/cyconet-logo.svg',
+    icon: [{ url: '/logo.png' }],
+    apple: '/logo.png',
   },
 };
 
@@ -94,7 +80,6 @@ export default function RootLayout({
       lang="en"
       dir="ltr"
       data-scroll-behavior="smooth"
-      className={`${display.variable} ${sans.variable}`}
     >
       <head>
         {/*

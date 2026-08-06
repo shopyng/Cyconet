@@ -1,5 +1,6 @@
 import LoginForm from '@/components/app/LoginForm';
 import { getSession } from '@/lib/auth';
+import { tenantUrl } from '@/lib/tenant';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 
@@ -20,16 +21,25 @@ export default async function LearningLoginPage() {
    * Already signed in? Skip straight to the hub. This catches the case where
    * a student bookmarked the login URL or a password manager lands them here
    * after the cookie is already set.
+   *
+   * A student stays on this host, so a bare '/' is right. An admin belongs on
+   * the admin host entirely, which needs an absolute URL to cross origins.
    */
   const session = await getSession();
   if (session) {
-    redirect(session.role === 'ADMIN' ? '/admin' : '/learning');
+    redirect(session.role === 'ADMIN' ? await tenantUrl('admin') : '/');
   }
 
   return (
     <LoginForm
-      heading="Student Login"
-      sub="Sign in to access your courses, exams, and progress."
+      heading="Welcome back"
+      sub="Sign in to continue your programme."
+      eyebrow="Student portal"
+      highlights={[
+        'Track progress across every module',
+        'Sit exams and submit graded projects',
+        'Earn certificates employers can verify',
+      ]}
     />
   );
 }

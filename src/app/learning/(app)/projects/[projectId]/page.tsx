@@ -12,7 +12,7 @@ import {
   humanStatus,
   formatDateTime,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Project' };
@@ -54,6 +54,21 @@ export default async function ProjectDetailPage({
           <Markdown content={project.requirements} />
         </Card>
       </Section>
+
+      {project.rubricItems.length > 0 ? (
+        <Section title="Rubric">
+          <Card>
+            <ul style={styles.history}>
+              {project.rubricItems.map((item) => (
+                <li key={item.id} style={styles.rubricItem}>
+                  <span style={styles.rubricLabel}>{item.label}</span>
+                  <span style={styles.historyDate}>{item.points} pts</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </Section>
+      ) : null}
 
       {latest?.feedback ? (
         <Section title="Reviewer feedback">
@@ -101,6 +116,19 @@ export default async function ProjectDetailPage({
                   </span>
                 </div>
                 <p style={styles.historyDesc}>{submission.description}</p>
+                {submission.feedbackThread.length > 0 ? (
+                  <div style={styles.thread}>
+                    {submission.feedbackThread.map((message) => (
+                      <div key={message.id} style={styles.threadItem}>
+                        <strong style={styles.rubricLabel}>{message.authorName}</strong>
+                        <span style={styles.historyDate}>
+                          {message.authorRole.toLowerCase()} · {formatDateTime(message.createdAt)}
+                        </span>
+                        <p style={styles.historyDesc}>{message.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 <p style={styles.historyLinks}>
                   {submission.repoUrl ? (
                     <a
@@ -142,7 +170,7 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   h1: {
     marginTop: '0.3rem',
@@ -151,15 +179,15 @@ const styles = {
     fontWeight: 700,
     letterSpacing: '-0.03em',
     lineHeight: 1.15,
-    color: color.text,
+    color: 'var(--text)',
   },
   desc: {
     marginTop: '0.6rem',
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     lineHeight: 1.6,
   },
   feedback: {
-    color: color.text,
+    color: 'var(--text)',
     fontSize: font.small,
     lineHeight: 1.7,
     whiteSpace: 'pre-wrap',
@@ -167,12 +195,12 @@ const styles = {
   feedbackMeta: {
     marginTop: '0.75rem',
     fontSize: font.eyebrow,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   closed: {
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   history: {
     display: 'flex',
@@ -184,7 +212,7 @@ const styles = {
   },
   historyItem: {
     paddingBottom: '1rem',
-    borderBottom: `1px solid ${color.border}`,
+    borderBottom: `1px solid var(--border)`,
   },
   historyHead: {
     display: 'flex',
@@ -193,13 +221,13 @@ const styles = {
   },
   historyDate: {
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   historyDesc: {
     marginTop: '0.6rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
     whiteSpace: 'pre-wrap',
   },
   historyLinks: {
@@ -207,8 +235,31 @@ const styles = {
     gap: '1rem',
     marginTop: '0.6rem',
   },
+  rubricItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '1rem',
+    fontSize: font.small,
+  },
+  rubricLabel: {
+    color: 'var(--text)',
+  },
+  thread: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+    marginTop: '0.85rem',
+    paddingTop: '0.85rem',
+    borderTop: '1px solid var(--border)',
+  },
+  threadItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem',
+  },
   link: {
-    color: color.cyan,
+    color: 'var(--primary)',
     fontSize: font.small,
     textDecoration: 'none',
   },

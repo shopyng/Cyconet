@@ -14,11 +14,10 @@ import 'server-only';
  *   LEAD_FROM_EMAIL    verified sender, e.g. "Cyconet <noreply@cyconet.com>"
  *   LEAD_NOTIFY_EMAIL  where submissions land, e.g. admissions@cyconet.com
  *
- * Until they are set, submissions are written to `.leads.jsonl` in development
- * so the flow is testable, and **rejected with an actionable error in
- * production**. That is deliberate: silently accepting a lead that goes nowhere
- * is worse than telling the applicant to email us directly. Swapping Resend for
- * a database or CRM means rewriting `deliver()` and nothing else.
+ * Programme applications are stored in Postgres first and use this module only
+ * for best-effort staff notification. Other leads are written to `.leads.jsonl`
+ * in development when email is not configured, and rejected with an actionable
+ * error in production so enquiries do not silently disappear.
  */
 
 import { appendFile } from 'node:fs/promises';
@@ -147,11 +146,29 @@ export async function deliver(
   kind: LeadKind,
   values: Record<string, string>,
 ): Promise<void> {
+  await sendEmail({
+    replyTo: values.email || undefined,
+    subject: `${SUBJECTS[kind]} — ${values.name || values.email || 'Cyconet'}`,
+    text: toEmailBody(kind, values),
+  });
+}
+
+export async function sendEmail({
+  to,
+  replyTo,
+  subject,
+  text,
+}: {
+  to?: string;
+  replyTo?: string;
+  subject: string;
+  text: string;
+}): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.LEAD_FROM_EMAIL;
-  const to = process.env.LEAD_NOTIFY_EMAIL;
+  const recipient = to ?? process.env.LEAD_NOTIFY_EMAIL;
 
-  if (apiKey && from && to) {
+  if (apiKey && from && recipient) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -160,10 +177,10 @@ export async function deliver(
       },
       body: JSON.stringify({
         from,
-        to: [to],
-        reply_to: values.email || undefined,
-        subject: `${SUBJECTS[kind]} — ${values.name || values.email || 'Cyconet'}`,
-        text: toEmailBody(kind, values),
+        to: [recipient],
+        reply_to: replyTo,
+        subject,
+        text,
       }),
     });
 
@@ -175,10 +192,10 @@ export async function deliver(
 
   // Not configured. In development, persist locally so the flow is testable.
   if (process.env.NODE_ENV !== 'production') {
-    const line = JSON.stringify({ kind, values, at: new Date().toISOString() });
+    const line = JSON.stringify({ kind: 'email', to: recipient, subject, text, at: new Date().toISOString() });
     await appendFile('.leads.jsonl', `${line}\n`, 'utf8');
     console.warn(
-      `[leads] No RESEND_API_KEY configured — ${kind} written to .leads.jsonl instead of being emailed.`,
+      `[leads] No RESEND_API_KEY configured — email written to .leads.jsonl instead of being sent.`,
     );
     return;
   }

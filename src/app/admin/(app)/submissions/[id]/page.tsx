@@ -15,7 +15,7 @@ import {
   humanStatus,
   formatDateTime,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Review submission' };
@@ -137,12 +137,12 @@ const styles = {
     fontSize: font.small,
   },
   link: {
-    color: color.cyan,
+    color: 'var(--primary)',
     textDecoration: 'none',
     overflowWrap: 'anywhere',
   },
   faint: {
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   pre: {
     display: 'block',

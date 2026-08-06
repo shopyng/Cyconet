@@ -8,7 +8,7 @@ import {
   ProgressBar,
   Badge,
 } from '@/components/app/Primitives';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Course' };
@@ -98,7 +98,7 @@ export default async function CourseDetailPage({
                           <a href={`/lessons/${lesson.id}`} style={styles.lessonLink}>
                             <span
                               aria-hidden="true"
-                              style={{ color: complete ? color.cyan : color.textFaint }}
+                              style={{ color: complete ? 'var(--primary)' : 'var(--textFaint)' }}
                             >
                               {complete ? '●' : '○'}
                             </span>
@@ -123,7 +123,7 @@ export default async function CourseDetailPage({
 
 const styles = {
   cta: {
-    color: color.cyan,
+    color: 'var(--primary)',
     fontSize: font.small,
     fontWeight: 500,
     textDecoration: 'none',
@@ -131,7 +131,7 @@ const styles = {
   doneNote: {
     marginTop: '1rem',
     fontSize: font.small,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   modules: {
     display: 'flex',
@@ -149,25 +149,25 @@ const styles = {
     fontSize: font.eyebrow,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   moduleTitle: {
     marginTop: '0.15rem',
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: font.h3,
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   moduleDesc: {
     marginTop: '0.5rem',
     fontSize: font.small,
     lineHeight: 1.6,
-    color: color.textMuted,
+    color: 'var(--textMuted)',
   },
   noLessons: {
     marginTop: '1rem',
     fontSize: font.small,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
   },
   lessonList: {
     display: 'flex',
@@ -188,13 +188,13 @@ const styles = {
     textDecoration: 'none',
   },
   lessonTitle: {
-    color: color.text,
+    color: 'var(--text)',
     minWidth: 0,
   },
   completeTag: {
     marginLeft: 'auto',
     fontSize: font.eyebrow,
-    color: color.textFaint,
+    color: 'var(--textFaint)',
     whiteSpace: 'nowrap',
   },
 } satisfies Record<string, React.CSSProperties>;

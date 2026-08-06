@@ -12,7 +12,7 @@
 import { useActionState } from 'react';
 import { IDLE_STATE, type FormState } from '@/lib/form-state';
 import { FormStatus, TextArea, TextField } from '@/components/forms/Field';
-import { color, ease, radius } from '@/lib/theme';
+import { ease, radius } from '@/lib/theme';
 
 type Action = (state: FormState, formData: FormData) => Promise<FormState>;
 
@@ -338,6 +338,219 @@ export function TimetableForm({
 }
 
 /* ------------------------------------------------------------------ *
+ * Curriculum authoring (admin)
+ * ------------------------------------------------------------------ */
+
+export function ProgramForm({
+  action,
+  initial,
+}: {
+  action: Action;
+  initial?: { id: string; title: string; duration: string; description: string };
+}) {
+  const [state, formAction, pending] = useActionState(action, IDLE_STATE);
+
+  return (
+    <form action={formAction} style={styles.form}>
+      {initial ? <input type="hidden" name="originalId" value={initial.id} /> : null}
+      <FormStatus status={state.status} message={state.message} />
+      <TextField name="id" label="Programme ID" hint="URL-safe slug, e.g. cloud-computing." error={state.errors?.id} defaultValue={initial?.id} />
+      <TextField name="title" label="Title" required error={state.errors?.title} defaultValue={initial?.title} />
+      <TextField name="duration" label="Duration" required error={state.errors?.duration} defaultValue={initial?.duration} />
+      <TextArea name="description" label="Description" required rows={4} error={state.errors?.description} defaultValue={initial?.description} />
+      <div>
+        <button type="submit" className="act act-primary" disabled={pending}>
+          {pending ? 'Saving…' : initial ? 'Update programme' : 'Create programme'}
+        </button>
+      </div>
+      <ButtonStyles />
+    </form>
+  );
+}
+
+export function ModuleForm({
+  action,
+  programId,
+  nextOrder,
+  initial,
+}: {
+  action: Action;
+  programId: string;
+  nextOrder: number;
+  initial?: { id: string; title: string; description: string; order: number };
+}) {
+  const [state, formAction, pending] = useActionState(action, IDLE_STATE);
+
+  return (
+    <form action={formAction} style={styles.form}>
+      <input type="hidden" name="programId" value={programId} />
+      {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
+      <FormStatus status={state.status} message={state.message} />
+      <div style={styles.pair}>
+        <TextField name="title" label="Module title" required error={state.errors?.title} defaultValue={initial?.title} />
+        <TextField name="order" label="Order" required defaultValue={String(initial?.order ?? nextOrder)} error={state.errors?.order} />
+      </div>
+      <TextArea name="description" label="Description" required rows={3} error={state.errors?.description} defaultValue={initial?.description} />
+      <div>
+        <button type="submit" className="act act-primary" disabled={pending}>
+          {pending ? 'Saving…' : initial ? 'Update module' : 'Add module'}
+        </button>
+      </div>
+      <ButtonStyles />
+    </form>
+  );
+}
+
+export function LessonForm({
+  action,
+  moduleId,
+  nextOrder,
+  initial,
+}: {
+  action: Action;
+  moduleId: string;
+  nextOrder: number;
+  initial?: { id: string; title: string; content: string; videoUrl: string | null; order: number };
+}) {
+  const [state, formAction, pending] = useActionState(action, IDLE_STATE);
+
+  return (
+    <form action={formAction} style={styles.form}>
+      <input type="hidden" name="moduleId" value={moduleId} />
+      {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
+      <FormStatus status={state.status} message={state.message} />
+      <div style={styles.pair}>
+        <TextField name="title" label="Lesson title" required error={state.errors?.title} defaultValue={initial?.title} />
+        <TextField name="order" label="Order" required defaultValue={String(initial?.order ?? nextOrder)} error={state.errors?.order} />
+      </div>
+      <TextField name="videoUrl" label="Video URL" error={state.errors?.videoUrl} defaultValue={initial?.videoUrl ?? undefined} />
+      <TextArea name="content" label="Lesson content" required rows={8} hint="Markdown is supported." error={state.errors?.content} defaultValue={initial?.content} />
+      <div style={styles.pair}>
+        <TextField name="resourceLabel" label="Resource label" error={state.errors?.resourceLabel} />
+        <TextField name="resourceUrl" label="Resource URL" error={state.errors?.resourceUrl} />
+      </div>
+      <div>
+        <button type="submit" className="act act-primary" disabled={pending}>
+          {pending ? 'Saving…' : initial ? 'Update lesson' : 'Add lesson'}
+        </button>
+      </div>
+      <ButtonStyles />
+    </form>
+  );
+}
+
+export function ExamForm({
+  action,
+  programId,
+  initial,
+}: {
+  action: Action;
+  programId: string;
+  initial?: { id: string; title: string; description: string; passingScore: number };
+}) {
+  const [state, formAction, pending] = useActionState(action, IDLE_STATE);
+
+  return (
+    <form action={formAction} style={styles.form}>
+      <input type="hidden" name="programId" value={programId} />
+      {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
+      <FormStatus status={state.status} message={state.message} />
+      <div style={styles.pair}>
+        <TextField name="title" label="Exam title" required error={state.errors?.title} defaultValue={initial?.title} />
+        <TextField name="passingScore" label="Pass mark" required defaultValue={String(initial?.passingScore ?? 70)} error={state.errors?.passingScore} />
+      </div>
+      <TextArea name="description" label="Description" required rows={3} error={state.errors?.description} defaultValue={initial?.description} />
+      <div>
+        <button type="submit" className="act act-primary" disabled={pending}>
+          {pending ? 'Saving…' : initial ? 'Update exam' : 'Add exam'}
+        </button>
+      </div>
+      <ButtonStyles />
+    </form>
+  );
+}
+
+export function QuestionForm({
+  action,
+  examId,
+  nextOrder,
+  initial,
+}: {
+  action: Action;
+  examId: string;
+  nextOrder: number;
+  initial?: { id: string; question: string; options: unknown; correct: string; order: number };
+}) {
+  const [state, formAction, pending] = useActionState(action, IDLE_STATE);
+
+  return (
+    <form action={formAction} style={styles.form}>
+      <input type="hidden" name="examId" value={examId} />
+      {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
+      <FormStatus status={state.status} message={state.message} />
+      <TextArea name="question" label="Question" required rows={3} error={state.errors?.question} defaultValue={initial?.question} />
+      <div style={styles.pair}>
+        <TextField name="optionA" label="Option A" required error={state.errors?.optionA} defaultValue={Array.isArray(initial?.options) ? String(initial.options[0] ?? '') : undefined} />
+        <TextField name="optionB" label="Option B" required error={state.errors?.optionB} defaultValue={Array.isArray(initial?.options) ? String(initial.options[1] ?? '') : undefined} />
+        <TextField name="optionC" label="Option C" required error={state.errors?.optionC} defaultValue={Array.isArray(initial?.options) ? String(initial.options[2] ?? '') : undefined} />
+        <TextField name="optionD" label="Option D" required error={state.errors?.optionD} defaultValue={Array.isArray(initial?.options) ? String(initial.options[3] ?? '') : undefined} />
+      </div>
+      <div style={styles.pair}>
+        <div style={styles.field}>
+          <label htmlFor={`correct-${examId}-${initial?.id ?? 'new'}`} style={styles.label}>Correct answer</label>
+          <select id={`correct-${examId}-${initial?.id ?? 'new'}`} name="correct" className="cn-control" defaultValue={initial?.correct ?? 'A'}>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+        <TextField name="order" label="Order" required defaultValue={String(initial?.order ?? nextOrder)} error={state.errors?.order} />
+      </div>
+      <div>
+        <button type="submit" className="act act-primary" disabled={pending}>
+          {pending ? 'Saving…' : initial ? 'Update question' : 'Add question'}
+        </button>
+      </div>
+      <ButtonStyles />
+    </form>
+  );
+}
+
+export function ProjectForm({
+  action,
+  programId,
+  initial,
+}: {
+  action: Action;
+  programId: string;
+  initial?: { id: string; title: string; description: string; requirements: string };
+}) {
+  const [state, formAction, pending] = useActionState(action, IDLE_STATE);
+
+  return (
+    <form action={formAction} style={styles.form}>
+      <input type="hidden" name="programId" value={programId} />
+      {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
+      <FormStatus status={state.status} message={state.message} />
+      <TextField name="title" label="Project title" required error={state.errors?.title} defaultValue={initial?.title} />
+      <TextArea name="description" label="Description" required rows={3} error={state.errors?.description} defaultValue={initial?.description} />
+      <TextArea name="requirements" label="Requirements" required rows={6} hint="Markdown is supported." error={state.errors?.requirements} defaultValue={initial?.requirements} />
+      <div style={styles.pair}>
+        <TextField name="rubricLabel" label="First rubric item" error={state.errors?.rubricLabel} />
+        <TextField name="rubricPoints" label="Points" defaultValue="10" error={state.errors?.rubricPoints} />
+      </div>
+      <div>
+        <button type="submit" className="act act-primary" disabled={pending}>
+          {pending ? 'Saving…' : initial ? 'Update project' : 'Add project'}
+        </button>
+      </div>
+      <ButtonStyles />
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * Shared button skin
  * ------------------------------------------------------------------ */
 
@@ -351,10 +564,10 @@ function ButtonStyles() {
     <style jsx>{`
       .act {
         padding: 0.6rem 1.1rem;
-        border: 1px solid ${color.border};
+        border: 1px solid var(--border);
         border-radius: ${radius.md}px;
-        background: ${color.surface};
-        color: ${color.text};
+        background: ${'var(--surface)'};
+        color: ${'var(--text)'};
         font-family: inherit;
         font-size: 0.92rem;
         font-weight: 500;
@@ -366,8 +579,8 @@ function ButtonStyles() {
       }
 
       .act:hover:not(:disabled) {
-        background: ${color.surfaceHover};
-        border-color: ${color.borderStrong};
+        background: ${'var(--surfaceHover)'};
+        border-color: var(--borderStrong);
       }
 
       .act:disabled {
@@ -376,23 +589,23 @@ function ButtonStyles() {
       }
 
       .act-primary {
-        border-color: rgba(0, 229, 255, 0.35);
-        background: rgba(0, 229, 255, 0.1);
-        color: ${color.cyan};
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #fff;
       }
 
       .act-primary:hover:not(:disabled) {
-        background: rgba(0, 229, 255, 0.16);
-        border-color: rgba(0, 229, 255, 0.5);
+        background: var(--primaryHover);
+        border-color: var(--primaryHover);
       }
 
       .act-danger {
-        border-color: rgba(252, 165, 165, 0.3);
-        color: #fca5a5;
+        border-color: var(--danger);
+        color: var(--danger);
       }
 
       .act-danger:hover:not(:disabled) {
-        background: rgba(252, 165, 165, 0.1);
+        background: var(--dangerSoft);
         border-color: rgba(252, 165, 165, 0.45);
       }
     `}</style>
@@ -423,11 +636,11 @@ const styles = {
   label: {
     fontSize: '0.88rem',
     fontWeight: 600,
-    color: color.text,
+    color: 'var(--text)',
   },
   req: {
     marginLeft: 3,
-    color: color.cyan,
+    color: 'var(--primary)',
   },
   error: {
     fontSize: '0.82rem',

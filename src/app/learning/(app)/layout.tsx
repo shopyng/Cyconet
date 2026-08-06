@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { verifySession } from '@/lib/dal';
 import { signOut } from '@/lib/auth-actions';
+import { getTheme, toggleTheme } from '@/lib/theme-actions';
 import Shell, { type NavItem } from '@/components/app/Shell';
 
 /**
@@ -37,6 +38,7 @@ export default async function LearningAppLayout({
    * nextUrl.pathname inside the app already shows the rewritten /learning/... form.
    */
   const pathname = (await headers()).get('x-pathname') ?? '/';
+  const theme = await getTheme();
 
   return (
     <Shell
@@ -45,6 +47,8 @@ export default async function LearningAppLayout({
       pathname={pathname}
       user={{ name: user.name, email: user.email }}
       onSignOut={signOut}
+      onToggleTheme={toggleTheme}
+      theme={theme}
     >
       {children}
     </Shell>

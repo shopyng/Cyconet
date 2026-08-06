@@ -90,9 +90,9 @@ function buildGraph() {
       url: `${SITE_URL}/`,
       logo: {
         '@type': 'ImageObject',
-        url: `${SITE_URL}/cyconet-logo.svg`,
-        width: 512,
-        height: 512,
+        url: `${SITE_URL}/logo.png`,
+        width: 1080,
+        height: 1080,
       },
       image: `${SITE_URL}/opengraph-image`,
       description: brand.shortDescription,

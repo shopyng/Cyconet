@@ -29,11 +29,23 @@ export default function LoginForm({
   highlights = [],
   /** Panel eyebrow, e.g. "Student portal" or "Staff access". */
   eyebrow,
+  /**
+   * Absolute URL of the registration page on the apex host.
+   *
+   * Passed in rather than derived here: this is a Client Component, and
+   * `apexUrl()` is server-only because it reads the Host header. The login
+   * pages are Server Components, so they resolve it and hand it down.
+   *
+   * Omitted on the staff form — there is no self-serve route to an admin
+   * account, so offering one there would be a dead end.
+   */
+  registerUrl,
 }: {
   heading: string;
   sub: string;
   highlights?: readonly string[];
   eyebrow?: string;
+  registerUrl?: string;
 }) {
   const [state, formAction, pending] = useActionState(signIn, IDLE_STATE);
 
@@ -133,12 +145,15 @@ export default function LoginForm({
           </form>
 
           {/*
-            Accounts are created by staff when an application is accepted, so
-            there is no sign-up to offer — this points at the real route in.
+            Registration is self-serve and lives on the marketing host, so this
+            is an absolute URL rather than a same-host link — the proxy would
+            otherwise rewrite /register onto this tenant's prefix and 404.
           */}
-          <p className="foot">
-            No account yet? <a href="/apply">Apply for a programme</a>
-          </p>
+          {registerUrl ? (
+            <p className="foot">
+              No account yet? <a href={registerUrl}>Create one</a>
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -155,7 +170,8 @@ export default function LoginForm({
           display: none;
           padding: 3rem;
           background: linear-gradient(150deg, var(--primary), var(--primaryHover));
-          color: #fff;
+          /* Same reason as .submit — the dark theme's primary is cyan. */
+          color: var(--onPrimary);
         }
 
         .panel-inner {
@@ -180,7 +196,8 @@ export default function LoginForm({
           width: 12px;
           height: 12px;
           border-radius: 3px;
-          background: #fff;
+          /* Follows the panel's ink so it stays visible whichever theme is on. */
+          background: currentColor;
         }
 
         .eyebrow {
@@ -304,7 +321,7 @@ export default function LoginForm({
           border: none;
           border-radius: ${radius.sm}px;
           background: var(--primary);
-          color: #fff;
+          color: var(--onPrimary);
           font-size: 0.96rem;
           font-weight: 600;
           cursor: pointer;

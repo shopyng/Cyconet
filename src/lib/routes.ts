@@ -19,6 +19,8 @@ export const routes = {
   solutions: '/solutions',
   hub: '/co-working-hub',
   apply: '/apply',
+  /** Self-serve enrolment: creates the account, then gates on payment. */
+  register: '/register',
   program: (slug: string) => `/programs/${slug}`,
 } as const;
 

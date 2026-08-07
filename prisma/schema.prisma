@@ -23,8 +23,10 @@ model User {
   enrollments        Enrollment[]
   progress           Progress[]
   examAttempts       ExamAttempt[]
+  examSessions       ExamSession[]
   projectSubmissions ProjectSubmission[]
   certificates       Certificate[]
+  payments           Payment[]
   notifications      Notification[]
   auditLogs          AuditLog[]
 }
@@ -69,11 +71,19 @@ model Program {
   duration    String
   description String @db.Text
 
+  /*
+   * Tuition in kobo — the minor unit of the Naira. Money is an integer count of
+   * minor units, never a float: ₦450,000.50 has no exact binary representation
+   * and rounding drift on a fee is a real invoice dispute.
+   */
+  priceKobo Int @default(0)
+
   modules      Module[]
   enrollments  Enrollment[]
   exams        Exam[]
   projects     Project[]
   certificates Certificate[]
+  payments     Payment[]
 }
 
 model Enrollment {
@@ -82,12 +92,31 @@ model Enrollment {
   programId String
   startedAt DateTime @default(now())
 
+  /*
+   * Defaults to ACTIVE, not PENDING_PAYMENT, and that is deliberate.
+   *
+   * The schema is applied with `prisma db push`, so adding this column
+   * backfills every existing row with the default. Defaulting to
+   * PENDING_PAYMENT would lock out every student currently studying. Both
+   * creation sites set the value explicitly instead: self-serve registration
+   * writes PENDING_PAYMENT, and an admin accepting an application writes ACTIVE.
+   */
+  status      EnrollmentStatus @default(ACTIVE)
+  activatedAt DateTime?
+
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
 
   @@unique([userId, programId])
   @@index([userId])
   @@index([programId])
+  @@index([status])
+}
+
+enum EnrollmentStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  SUSPENDED
 }
 
 model Module {
@@ -160,9 +189,17 @@ model Exam {
   description  String @db.Text
   passingScore Int    @default(70)  // percentage
 
+  /** Wall-clock minutes from starting a sitting to its hard deadline. */
+  durationMinutes Int @default(30)
+  /** Sittings allowed per student. 0 means unlimited. */
+  maxAttempts     Int @default(3)
+  /** Randomise question and option order per sitting. */
+  shuffleQuestions Boolean @default(true)
+
   program   Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
   questions ExamQuestion[]
   attempts  ExamAttempt[]
+  sessions  ExamSession[]
 
   @@index([programId])
 }
@@ -180,6 +217,55 @@ model ExamQuestion {
   @@index([examId])
 }
 
+/**
+ * One sitting of an exam.
+ *
+ * The server owns the clock. `expiresAt` is computed here at start time and is
+ * the only deadline that counts — the countdown a student sees is presentation,
+ * and a client that lies about the time still submits into an expired session.
+ *
+ * The shuffled order is frozen at creation rather than re-derived per render.
+ * Without that, reloading the page would deal a fresh permutation, which both
+ * leaks information across reloads and makes the stored answers ambiguous:
+ * "option 2" only means something against a known ordering.
+ */
+model ExamSession {
+  id        String   @id @default(cuid())
+  userId    String
+  examId    String
+  startedAt DateTime @default(now())
+  expiresAt DateTime
+  status    ExamSessionStatus @default(ACTIVE)
+
+  /** string[] of ExamQuestion ids, in the order this student was shown them. */
+  questionOrder Json
+  /** Record<questionId, number[]> — the option permutation per question. */
+  optionOrder   Json
+  /** Answers saved as the student works, so a forced submit still grades real work. */
+  savedAnswers  Json?
+
+  /** Focus loss, paste attempts, and similar. Three ends the sitting. */
+  violations   Int   @default(0)
+  violationLog Json?
+
+  submittedAt DateTime?
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam    Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  attempt ExamAttempt?
+
+  @@index([userId])
+  @@index([examId])
+  @@index([status])
+}
+
+enum ExamSessionStatus {
+  ACTIVE
+  SUBMITTED
+  EXPIRED
+  VOIDED
+}
+
 model ExamAttempt {
   id          String   @id @default(cuid())
   userId      String
@@ -189,8 +275,15 @@ model ExamAttempt {
   passed      Boolean
   attemptedAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+  /** Null for attempts recorded before proctoring existed. */
+  sessionId     String?  @unique
+  /** True when the deadline or a violation lockout ended the sitting, not the student. */
+  autoSubmitted Boolean  @default(false)
+  violations    Int      @default(0)
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam    Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  session ExamSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([examId])
@@ -283,6 +376,81 @@ model Certificate {
   @@unique([userId, programId])
   @@index([userId])
   @@index([programId])
+}
+
+// ============================================================================
+// Payments
+// ============================================================================
+
+/**
+ * One tuition payment, per student per programme.
+ *
+ * Created at registration in the AWAITING_PROOF state — the row exists before
+ * any money moves, because it is what the payment screen renders from and what
+ * carries the reference the student quotes on the transfer.
+ */
+model Payment {
+  id        String @id @default(cuid())
+  userId    String
+  programId String
+
+  /** Quoted to the student and expected on the bank narration, e.g. CYC-7K2QW4. */
+  reference String @unique
+  /*
+   * The fee as it stood when this student registered, in kobo. A snapshot, not
+   * a lookup: Program.priceKobo can change for a later cohort, and that must
+   * not retroactively alter what someone already agreed to pay.
+   */
+  amountKobo Int
+
+  status   PaymentStatus   @default(AWAITING_PROOF)
+  provider PaymentProvider @default(MANUAL)
+
+  reviewedAt  DateTime?
+  reviewedBy  String? // admin user ID
+  reviewNotes String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  proof   PaymentProof?
+
+  @@unique([userId, programId])
+  @@index([userId])
+  @@index([status])
+}
+
+enum PaymentStatus {
+  AWAITING_PROOF
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PaymentProvider {
+  MANUAL
+  PAYSTACK
+}
+
+/**
+ * The uploaded receipt.
+ *
+ * A separate table purely so the bytes are not dragged along by every query
+ * that lists payments — Prisma returns all scalars unless a `select` says
+ * otherwise, so a Bytes column on Payment would stream every receipt into the
+ * admin queue. Here the blob only loads when something joins to it on purpose.
+ */
+model PaymentProof {
+  id         String   @id @default(cuid())
+  paymentId  String   @unique
+  data       Bytes
+  mimeType   String
+  fileName   String
+  size       Int
+  uploadedAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 }
 
 // ============================================================================

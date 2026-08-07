@@ -58,6 +58,7 @@ async function main() {
       id: 'cybersecurity',
       title: 'Cybersecurity',
       duration: '14 weeks',
+      priceKobo: 45_000_000, // ₦450,000
       description:
         'Offensive and defensive security in a live lab range — threat modelling, network defence, penetration testing and incident response.',
     },
@@ -65,6 +66,7 @@ async function main() {
       id: 'software-engineering',
       title: 'Software Engineering',
       duration: '16 weeks',
+      priceKobo: 42_000_000, // ₦420,000
       description:
         'Build and deploy production web applications end to end. You ship five real projects and leave with a portfolio.',
     },
@@ -72,6 +74,7 @@ async function main() {
       id: 'data-science',
       title: 'Data Science',
       duration: '14 weeks',
+      priceKobo: 40_000_000, // ₦400,000
       description:
         'Turn messy real-world data into decisions leadership acts on — statistics, modelling, and storytelling.',
     },
@@ -79,6 +82,7 @@ async function main() {
       id: 'ai-ml',
       title: 'AI & Machine Learning',
       duration: '18 weeks',
+      priceKobo: 52_000_000, // ₦520,000
       description:
         'From gradient descent to shipped inference. Train, evaluate and deploy models, then wrap them in products people use.',
     },
@@ -86,6 +90,7 @@ async function main() {
       id: 'cloud-computing',
       title: 'Cloud Computing',
       duration: '12 weeks',
+      priceKobo: 38_000_000, // ₦380,000
       description:
         'Design infrastructure that survives traffic, outages and audits — containers, IaC and CI/CD pipelines.',
     },
@@ -218,14 +223,60 @@ Learn to assess both dimensions and communicate findings to non-technical stakeh
   });
   console.log('✓ Created Module 2 with 2 lessons (Cybersecurity)');
 
-  // Enroll demo student in cybersecurity
+  // Enroll demo student in cybersecurity. ACTIVE with a matching APPROVED
+  // payment, so the demo account lands straight in the hub rather than on the
+  // payment gate.
   await prisma.enrollment.create({
     data: {
       userId: student.id,
       programId: 'cybersecurity',
+      status: 'ACTIVE',
+      activatedAt: new Date(),
     },
   });
-  console.log('✓ Enrolled demo student in Cybersecurity');
+  await prisma.payment.create({
+    data: {
+      userId: student.id,
+      programId: 'cybersecurity',
+      reference: 'CYC-DEMO01',
+      amountKobo: 45_000_000,
+      status: 'APPROVED',
+      reviewedAt: new Date(),
+      reviewedBy: admin.id,
+      reviewNotes: 'Seed data — payment pre-approved for the demo account.',
+    },
+  });
+  console.log('✓ Enrolled demo student in Cybersecurity (payment approved)');
+
+  /*
+   * A second student sitting at the payment gate, so the admin payments queue
+   * and the student-side payment screen both have something real to render.
+   */
+  const pendingStudent = await prisma.user.create({
+    data: {
+      email: 'pending@example.com',
+      password: await hashPassword('pending123'),
+      name: 'Tunde Adeyemi',
+      role: 'STUDENT',
+    },
+  });
+  await prisma.enrollment.create({
+    data: {
+      userId: pendingStudent.id,
+      programId: 'software-engineering',
+      status: 'PENDING_PAYMENT',
+    },
+  });
+  await prisma.payment.create({
+    data: {
+      userId: pendingStudent.id,
+      programId: 'software-engineering',
+      reference: 'CYC-DEMO02',
+      amountKobo: 42_000_000,
+      status: 'AWAITING_PROOF',
+    },
+  });
+  console.log('✓ Created pending student: pending@example.com / pending123');
 
   // Mark first lesson as complete
   const firstLesson = await prisma.lesson.findFirst({
@@ -251,6 +302,9 @@ Learn to assess both dimensions and communicate findings to non-technical stakeh
       title: 'Fundamentals Assessment',
       description: 'Test your understanding of networking and system administration basics.',
       passingScore: 70,
+      durationMinutes: 20,
+      maxAttempts: 3,
+      shuffleQuestions: true,
     },
   });
 
@@ -404,8 +458,9 @@ Learn to assess both dimensions and communicate findings to non-technical stakeh
 
   console.log('\n✅ Seed completed successfully!');
   console.log('\nLogin credentials:');
-  console.log('  Admin: admin@cyconet.ng / admin123');
-  console.log('  Student: student@example.com / student123');
+  console.log('  Admin:   admin@cyconet.ng / admin123');
+  console.log('  Student: student@example.com / student123  (enrolled, paid)');
+  console.log('  Student: pending@example.com / pending123  (awaiting payment)');
 }
 
 main()

@@ -1,5 +1,10 @@
 import { headers } from 'next/headers';
-import { verifyAdmin, pendingApplications, pendingSubmissions } from '@/lib/dal';
+import {
+  verifyAdmin,
+  pendingApplications,
+  pendingSubmissions,
+  pendingPaymentCount,
+} from '@/lib/dal';
 import { signOut } from '@/lib/auth-actions';
 import { getTheme, toggleTheme } from '@/lib/theme-actions';
 import Shell, { type NavItem } from '@/components/app/Shell';
@@ -26,14 +31,16 @@ export default async function AdminAppLayout({
    * without opening each screen. Both reads are already memoised by the DAL's
    * `cache()`, so a page that also renders these lists pays for one query.
    */
-  const [applications, submissions] = await Promise.all([
+  const [applications, submissions, payments] = await Promise.all([
     pendingApplications(),
     pendingSubmissions(),
+    pendingPaymentCount(),
   ]);
 
   const nav: readonly NavItem[] = [
     { href: '/', label: 'Overview', exact: true },
     { href: '/applications', label: 'Applications', badge: applications.length },
+    { href: '/payments', label: 'Payments', badge: payments },
     { href: '/students', label: 'Students' },
     { href: '/submissions', label: 'Project review', badge: submissions.length },
     { href: '/curriculum', label: 'Curriculum' },

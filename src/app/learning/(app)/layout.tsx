@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { verifySession } from '@/lib/dal';
+import { verifySession, requireActiveEnrollment } from '@/lib/dal';
 import { signOut } from '@/lib/auth-actions';
 import { getTheme, toggleTheme } from '@/lib/theme-actions';
 import Shell, { type NavItem } from '@/components/app/Shell';
@@ -28,6 +28,17 @@ export default async function LearningAppLayout({
   children: React.ReactNode;
 }) {
   const user = await verifySession();
+
+  /*
+   * Payment gate. A student whose enrolment is still PENDING_PAYMENT is sent to
+   * /payment, which lives in the sibling (onboarding) group precisely so this
+   * redirect does not point back into a layout that would fire it again.
+   *
+   * This is the navigational half of the boundary only. The enforcing half is
+   * `isEnrolled()`, which every learning Server Action calls — layouts do not
+   * run for Server Actions, so a layout check alone would stop nothing.
+   */
+  await requireActiveEnrollment();
 
   /*
    * The active nav item is resolved on the server so it is correct in the first

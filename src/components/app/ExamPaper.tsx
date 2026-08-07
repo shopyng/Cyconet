@@ -167,7 +167,7 @@ export default function ExamPaper({
           border: 1px solid var(--primary);
           border-radius: ${radius.md}px;
           background: var(--primary);
-          color: #fff;
+          color: var(--onPrimary);
           font-family: inherit;
           font-size: 0.95rem;
           font-weight: 600;

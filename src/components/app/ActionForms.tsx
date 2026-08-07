@@ -591,7 +591,7 @@ function ButtonStyles() {
       .act-primary {
         border-color: var(--primary);
         background: var(--primary);
-        color: #fff;
+        color: var(--onPrimary);
       }
 
       .act-primary:hover:not(:disabled) {

@@ -96,7 +96,7 @@ export default function Navbar() {
 
           <div className="cn-nav__actions">
             <span className="cn-nav__cta">
-              <Button href={routes.apply} variant="primary">
+              <Button href={routes.register} variant="primary">
                 Enroll Now
               </Button>
             </span>
@@ -140,7 +140,7 @@ export default function Navbar() {
             ))}
           </ul>
           <div style={styles.panelCta}>
-            <Button href={routes.apply} variant="primary" size="lg" fullWidth>
+            <Button href={routes.register} variant="primary" size="lg" fullWidth>
               Enroll Now
             </Button>
           </div>

@@ -55,8 +55,8 @@ export default function Admissions() {
               Seats are capped at 24 per track, and the cybersecurity cohort fills first.
             </p>
           </div>
-          <Button href="/apply" size="lg" trailing={<ArrowRight />}>
-            Start your application
+          <Button href="/register" size="lg" trailing={<ArrowRight />}>
+            Create your account
           </Button>
         </div>
       </SectionShell>

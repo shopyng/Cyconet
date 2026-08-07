@@ -190,7 +190,12 @@ export default function Shell({
           padding: 0.6rem 1rem;
           border-radius: ${radius.sm}px;
           background: var(--primary);
-          color: #fff;
+          /*
+           * Not #fff. The dark theme's primary is cyan, and white on it measures
+           * about 1.9:1 — unreadable. --onPrimary is near-black there and white
+           * on the light theme's indigo, so one rule stays legible in both.
+           */
+          color: var(--onPrimary);
         }
 
         .scrim {
@@ -270,7 +275,7 @@ export default function Shell({
           padding: 0.05rem 0.4rem;
           border-radius: 999px;
           background: var(--primary);
-          color: #fff;
+          color: var(--onPrimary);
           font-size: 0.72rem;
           font-weight: 700;
           text-align: center;

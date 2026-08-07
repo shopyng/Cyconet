@@ -418,6 +418,132 @@ export async function issueCertificate(
 }
 
 /* ------------------------------------------------------------------ *
+ * Payments
+ * ------------------------------------------------------------------ */
+
+/**
+ * Confirm or reject a tuition payment.
+ *
+ * Approving is what actually enrols someone: it flips the Enrollment from
+ * PENDING_PAYMENT to ACTIVE, which is the state `isEnrolled()` requires before
+ * any learning action will run. Both writes happen in one transaction, because
+ * an APPROVED payment beside a PENDING_PAYMENT enrolment would leave a student
+ * who has paid and still cannot get in.
+ */
+export async function reviewPayment(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifyAdmin();
+  const id = String(formData.get('id') ?? '');
+  const decision = String(formData.get('decision') ?? '');
+  const notes = String(formData.get('reviewNotes') ?? '').trim();
+
+  if (!id || (decision !== 'APPROVED' && decision !== 'REJECTED')) {
+    return { status: 'error', message: 'Choose confirm or reject.' };
+  }
+
+  const payment = await db.payment.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      amountKobo: true,
+      reference: true,
+      userId: true,
+      programId: true,
+      user: { select: { name: true, email: true } },
+      program: { select: { title: true } },
+    },
+  });
+
+  if (!payment) {
+    return { status: 'error', message: 'That payment does not exist.' };
+  }
+  if (payment.status === 'APPROVED') {
+    return { status: 'error', message: 'This payment has already been confirmed.' };
+  }
+
+  // Rejecting without saying why forces the student to guess, and they will
+  // simply re-upload the same receipt. Mirrors the rule on project revisions.
+  if (decision === 'REJECTED' && notes.length < 10) {
+    return {
+      status: 'error',
+      message: 'Explain what was wrong — at least 10 characters.',
+      errors: { reviewNotes: 'A reason is required when rejecting a payment.' },
+      values: { reviewNotes: notes },
+    };
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.payment.update({
+      where: { id },
+      data: {
+        status: decision,
+        reviewedAt: new Date(),
+        reviewedBy: admin.id,
+        reviewNotes: notes || null,
+      },
+    });
+
+    if (decision === 'APPROVED') {
+      await tx.enrollment.updateMany({
+        where: { userId: payment.userId, programId: payment.programId },
+        data: { status: 'ACTIVE', activatedAt: new Date() },
+      });
+    }
+
+    await tx.notification.create({
+      data: {
+        userId: payment.userId,
+        title: decision === 'APPROVED' ? 'Payment confirmed' : 'Payment could not be confirmed',
+        body:
+          decision === 'APPROVED'
+            ? `Your payment for ${payment.program.title} has been confirmed. The programme is now open.`
+            : `We could not confirm your payment for ${payment.program.title}. ${notes}`,
+        href: decision === 'APPROVED' ? '/courses' : '/payment',
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: decision === 'APPROVED' ? 'payment.approved' : 'payment.rejected',
+        entity: 'Payment',
+        entityId: id,
+        metadata: {
+          reference: payment.reference,
+          amountKobo: payment.amountKobo,
+          student: payment.user.email,
+          programId: payment.programId,
+        },
+      },
+    });
+  });
+
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+
+  await tryEmail(
+    payment.user.email,
+    decision === 'APPROVED'
+      ? 'Your Cyconet payment is confirmed'
+      : 'We could not confirm your Cyconet payment',
+    decision === 'APPROVED'
+      ? `Hello ${payment.user.name},\n\nYour payment for ${payment.program.title} has been confirmed and your programme is now open.\n\nSign in to the learning portal to get started.\n\nRegards,\nCyconet`
+      : `Hello ${payment.user.name},\n\nWe could not confirm your payment for ${payment.program.title}.\n\n${notes}\n\nUpload a corrected receipt from your payment page and we will review it again.\n\nRegards,\nCyconet`,
+  );
+
+  return {
+    status: 'success',
+    message:
+      decision === 'APPROVED'
+        ? `Payment confirmed. ${payment.user.name} is now enrolled on ${payment.program.title}.`
+        : 'Payment rejected. The student has been asked to upload a corrected receipt.',
+  };
+}
+
+/* ------------------------------------------------------------------ *
  * Timetable
  * ------------------------------------------------------------------ */
 
@@ -527,15 +653,22 @@ export async function saveProgram(
   const title = fieldValue(formData, 'title');
   const duration = fieldValue(formData, 'duration');
   const description = fieldValue(formData, 'description');
+  // Entered in naira — nobody wants to type kobo — and stored as minor units.
+  const priceNaira = Number(fieldValue(formData, 'priceNaira') || 0);
   const errors: Record<string, string> = {};
 
   if (!id) errors.id = 'Enter a URL-safe programme ID.';
   if (!title || title.length < 3) errors.title = 'Programme title is required.';
   if (!duration) errors.duration = 'Duration is required.';
   if (description.length < 30) errors.description = 'Description needs at least 30 characters.';
+  if (!Number.isFinite(priceNaira) || priceNaira < 0) {
+    errors.priceNaira = 'Enter the tuition fee in naira, or 0 for free.';
+  }
   if (Object.keys(errors).length > 0) {
     return { status: 'error', message: 'Please check the highlighted fields.', errors };
   }
+
+  const priceKobo = Math.round(priceNaira * 100);
 
   const existing = await db.program.findUnique({ where: { id } });
   if (!originalId && existing) {
@@ -543,8 +676,11 @@ export async function saveProgram(
   }
 
   const program = originalId
-    ? await db.program.update({ where: { id: originalId }, data: { title, duration, description } })
-    : await db.program.create({ data: { id, title, duration, description } });
+    ? await db.program.update({
+        where: { id: originalId },
+        data: { title, duration, description, priceKobo },
+      })
+    : await db.program.create({ data: { id, title, duration, description, priceKobo } });
 
   await audit(admin.id, originalId ? 'program.updated' : 'program.created', 'Program', program.id);
   revalidatePath('/admin', 'layout');

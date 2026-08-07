@@ -12,6 +12,18 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
+  experimental: {
+    serverActions: {
+      /*
+       * Server Action bodies are capped at 1MB by default, which a phone photo
+       * of a bank receipt clears easily. The action itself enforces a 5MB limit
+       * on the file; this leaves headroom above that for the multipart framing
+       * (boundaries and part headers), which the Next docs put at 10–20KB.
+       */
+      bodySizeLimit: '6mb',
+    },
+  },
+
   async redirects() {
     return [
       {

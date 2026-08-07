@@ -1,7 +1,8 @@
 import LoginForm from '@/components/app/LoginForm';
 import { getSession } from '@/lib/auth';
-import { tenantUrl } from '@/lib/tenant';
+import { tenantUrl, apexUrl } from '@/lib/tenant';
 import { redirect } from 'next/navigation';
+import { routes } from '@/lib/routes';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default async function LearningLoginPage() {
       heading="Welcome back"
       sub="Sign in to continue your programme."
       eyebrow="Student portal"
+      registerUrl={await apexUrl(routes.register)}
       highlights={[
         'Track progress across every module',
         'Sit exams and submit graded projects',

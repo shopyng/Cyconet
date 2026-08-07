@@ -37,6 +37,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      url: `${SITE_URL}${routes.register}`,
+      lastModified,
+      changeFrequency: 'monthly',
+      // Ranked above /apply: this is now the primary way a student enrols.
+      priority: 0.8,
+    },
+    {
       url: `${SITE_URL}${routes.apply}`,
       lastModified,
       changeFrequency: 'monthly',

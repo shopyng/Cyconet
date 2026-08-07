@@ -62,7 +62,9 @@ export const myEnrollments = cache(async () => {
   const user = await verifySession();
 
   return db.enrollment.findMany({
-    where: { userId: user.id },
+    // ACTIVE only, to match isEnrolled(): an unpaid programme must not appear
+    // in the hub, or the student would see lessons they cannot open.
+    where: { userId: user.id, status: 'ACTIVE' },
     include: {
       program: {
         include: {
@@ -165,9 +167,16 @@ export const isEnrolled = cache(async (programId: string): Promise<boolean> => {
   const user = await verifySession();
   const enrollment = await db.enrollment.findUnique({
     where: { userId_programId: { userId: user.id, programId } },
-    select: { id: true },
+    select: { status: true },
   });
-  return enrollment !== null;
+  /*
+   * ACTIVE only. Every learning Server Action gates on this function, and those
+   * actions are reachable by direct POST — so a student whose enrolment is
+   * still PENDING_PAYMENT must fail here, not merely be redirected away from
+   * the UI by the layout. Payment is a real boundary, and this is where it is
+   * enforced for writes.
+   */
+  return enrollment?.status === 'ACTIVE';
 });
 
 /**
@@ -237,6 +246,82 @@ export const myAttemptsForExam = cache(async (examId: string) => {
     where: { userId: user.id, examId },
     orderBy: { attemptedAt: 'desc' },
   });
+});
+
+/**
+ * The student's open sitting for an exam, or null.
+ *
+ * Returns the questions already reordered into the permutation frozen when the
+ * sitting started, with each question's options likewise permuted. The page
+ * renders exactly what comes back, so a reload cannot deal a different paper.
+ *
+ * Each option carries the letter it maps back to in `ExamQuestion.correct`, so
+ * the form still posts canonical letters and the grader is unchanged — the
+ * shuffle is presentation only.
+ */
+export const myActiveExamSession = cache(async (examId: string) => {
+  const user = await verifySession();
+
+  const session = await db.examSession.findFirst({
+    where: { userId: user.id, examId, status: 'ACTIVE' },
+    orderBy: { startedAt: 'desc' },
+  });
+  if (!session) return null;
+
+  // Expired but never closed out — treat as gone rather than serving a paper
+  // whose submission the action would refuse anyway.
+  if (session.expiresAt.getTime() <= Date.now()) return null;
+
+  const questions = await db.examQuestion.findMany({
+    where: { examId },
+    select: { id: true, question: true, options: true },
+  });
+  const byId = new Map(questions.map((question) => [question.id, question]));
+
+  const order = Array.isArray(session.questionOrder)
+    ? (session.questionOrder as string[])
+    : [];
+  const optionOrder =
+    session.optionOrder && typeof session.optionOrder === 'object'
+      ? (session.optionOrder as Record<string, number[]>)
+      : {};
+
+  const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+  const paper = order.flatMap((questionId) => {
+    const question = byId.get(questionId);
+    if (!question) return []; // Deleted mid-sitting — skip rather than crash.
+
+    const raw = Array.isArray(question.options) ? question.options.map(String) : [];
+    const permutation = optionOrder[questionId] ?? raw.map((_, index) => index);
+
+    return [
+      {
+        id: question.id,
+        question: question.question,
+        options: permutation
+          .filter((index) => index < raw.length)
+          .map((index) => ({
+            /* The canonical letter — what the grader compares against. */
+            value: LETTERS[index] ?? String(index + 1),
+            text: raw[index],
+          })),
+      },
+    ];
+  });
+
+  const saved =
+    session.savedAnswers && typeof session.savedAnswers === 'object'
+      ? (session.savedAnswers as Record<string, string>)
+      : {};
+
+  return {
+    id: session.id,
+    expiresAt: session.expiresAt,
+    violations: session.violations,
+    questions: paper,
+    savedAnswers: saved,
+  };
 });
 
 /** Every project across this student's programmes. */
@@ -317,6 +402,55 @@ export const myCertificates = cache(async () => {
     include: { program: { select: { id: true, title: true, duration: true } } },
     orderBy: { issuedAt: 'desc' },
   });
+});
+
+/* ------------------------------------------------------------------ *
+ * Payments
+ * ------------------------------------------------------------------ */
+
+/**
+ * This student's outstanding payment, if any — the row the payment screen
+ * renders. Newest first, so a student who somehow has two sees the current one.
+ *
+ * The proof blob is deliberately not selected: the screen only needs to know
+ * whether something was uploaded and what it was called.
+ */
+export const myPendingPayment = cache(async () => {
+  const user = await verifySession();
+
+  return db.payment.findFirst({
+    where: { userId: user.id, status: { in: ['AWAITING_PROOF', 'PENDING', 'REJECTED'] } },
+    select: {
+      id: true,
+      reference: true,
+      amountKobo: true,
+      status: true,
+      reviewNotes: true,
+      createdAt: true,
+      program: { select: { id: true, title: true, duration: true } },
+      proof: { select: { fileName: true, mimeType: true, uploadedAt: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+});
+
+/**
+ * Gate for the signed-in student area.
+ *
+ * Redirects to the payment screen unless at least one enrolment is ACTIVE.
+ * This is the *navigational* half of the payment boundary — the enforcing half
+ * is `isEnrolled()`, which every write action calls. A layout alone would not
+ * be enough, since Server Actions do not run layouts.
+ */
+export const requireActiveEnrollment = cache(async (): Promise<void> => {
+  const user = await verifySession();
+
+  const active = await db.enrollment.findFirst({
+    where: { userId: user.id, status: 'ACTIVE' },
+    select: { id: true },
+  });
+
+  if (!active) redirect('/payment');
 });
 
 /* ------------------------------------------------------------------ *
@@ -560,8 +694,44 @@ export const programForAdmin = cache(async (programId: string) => {
   });
 });
 
-/** Every issued certificate, newest first. */
-export const allCertificates = cache(async () => {
+/**
+ * Every payment, newest first.
+ *
+ * Deliberately not ordered by status: Postgres sorts an enum by its declaration
+ * order, which would put AWAITING_PROOF (nothing uploaded, nothing to do) ahead
+ * of PENDING (a receipt waiting on a decision). The page groups them instead,
+ * where the intent is explicit.
+ *
+ * The proof blob is not selected — only its metadata — so listing a hundred
+ * payments does not pull a hundred receipts out of Postgres.
+ */
+export const allPayments = cache(async () => {
+  await verifyAdmin();
+
+  return db.payment.findMany({
+    select: {
+      id: true,
+      reference: true,
+      amountKobo: true,
+      status: true,
+      createdAt: true,
+      reviewedAt: true,
+      reviewNotes: true,
+      user: { select: { id: true, name: true, email: true } },
+      program: { select: { id: true, title: true } },
+      proof: { select: { fileName: true, mimeType: true, size: true, uploadedAt: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+});
+
+/** Count of receipts waiting on a decision — drives the admin nav badge. */
+export const pendingPaymentCount = cache(async (): Promise<number> => {
+  await verifyAdmin();
+  return db.payment.count({ where: { status: 'PENDING' } });
+});
+
+/** Every issued certificate, newest first. */export const allCertificates = cache(async () => {
   await verifyAdmin();
   return db.certificate.findMany({
     include: {

@@ -6,7 +6,13 @@ import {
   verifySession,
 } from '@/lib/dal';
 import { db } from '@/lib/db';
-import { StatGrid, StatTile, formatWhen } from '@/components/app/Primitives';
+import {
+  StatGrid,
+  StatTile,
+  ProgressRing,
+  Badge,
+  formatWhen,
+} from '@/components/app/Primitives';
 import { font, radius } from '@/lib/theme';
 import type { Metadata } from 'next';
 
@@ -135,62 +141,82 @@ export default async function StudentDashboard() {
 
       {resume ? (
         <section style={styles.resume} aria-label="Continue learning">
-          <span style={styles.eyebrow}>Continue learning</span>
-          <h2 style={styles.resumeTitle}>{resume.program.title}</h2>
-          <Track pct={resume.pct} label={`${resume.program.title} progress`} />
-          <p style={styles.pct}>
-            {resume.done} of {resume.lessons.length} lessons · {resume.pct}%
-          </p>
-          <a href={`/courses/${resume.program.id}`} style={styles.cta}>
-            Resume programme →
-          </a>
+          <div style={styles.resumeBody}>
+            <span style={styles.eyebrow}>Continue learning</span>
+            <h2 style={styles.resumeTitle}>{resume.program.title}</h2>
+            <p style={styles.resumeMeta}>
+              {resume.lessons.length - resume.done} lesson
+              {resume.lessons.length - resume.done === 1 ? '' : 's'} left of{' '}
+              {resume.lessons.length}
+            </p>
+            <a href={`/courses/${resume.program.id}`} style={styles.cta}>
+              Resume programme →
+            </a>
+          </div>
+          {/*
+            The ring restates the same number the bar used to, but reads at a
+            glance from across a desk — this is the one figure a student checks
+            most often.
+          */}
+          <ProgressRing
+            done={resume.done}
+            total={resume.lessons.length}
+            label={`${resume.program.title} progress`}
+            size={116}
+          />
         </section>
       ) : null}
 
       <h2 style={styles.sectionHeading}>Your programmes</h2>
 
       <div style={styles.grid}>
-        {programs.map(({ enrollment, program, lessons, done, pct, status }) => (
-          <article key={enrollment.id} style={styles.card}>
-            <h3 style={styles.cardTitle}>{program.title}</h3>
-            <p style={styles.cardMeta}>{program.duration}</p>
+        {programs.map(({ enrollment, program, pct, status }) => {
+          const isComplete = pct === 100;
+          return (
+            /*
+              The whole card is the link target rather than a "Continue" affordance
+              tucked in the corner — a bigger hit area, and one tab stop per
+              programme instead of two.
+            */
+            <a
+              key={enrollment.id}
+              href={`/courses/${program.id}`}
+              className="stat-tile-link"
+              style={styles.card}
+            >
+              <div style={styles.cardHeader}>
+                <div>
+                  <h3 style={styles.cardTitle}>{program.title}</h3>
+                  <p style={styles.cardMeta}>{program.duration}</p>
+                </div>
+                {isComplete ? (
+                  <Badge tone="positive">Complete</Badge>
+                ) : (
+                  <Badge tone="neutral">{pct}%</Badge>
+                )}
+              </div>
 
-            <Track pct={pct} label={`${program.title} progress`} />
-            <p style={styles.pct}>
-              {done} of {lessons.length} lessons · {pct}%
-            </p>
-
-            <ul style={styles.gates}>
-              <Gate label="Lessons" done={status.lessons.done} total={status.lessons.total} />
-              <Gate label="Exams passed" done={status.exams.passed} total={status.exams.total} />
-              <Gate
-                label="Projects approved"
-                done={status.projects.approved}
-                total={status.projects.total}
-              />
-            </ul>
-
-            <a href={`/courses/${program.id}`} style={styles.link}>
-              Continue →
+              <ul style={styles.gates}>
+                <Gate
+                  label="Lessons"
+                  done={status.lessons.done}
+                  total={status.lessons.total}
+                />
+                <Gate
+                  label="Exams passed"
+                  done={status.exams.passed}
+                  total={status.exams.total}
+                />
+                <Gate
+                  label="Projects approved"
+                  done={status.projects.approved}
+                  total={status.projects.total}
+                />
+              </ul>
             </a>
-          </article>
-        ))}
+          );
+        })}
       </div>
-    </div>
-  );
-}
-
-function Track({ pct, label }: { pct: number; label: string }) {
-  return (
-    <div
-      style={styles.track}
-      role="progressbar"
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label={label}
-    >
-      <div style={{ ...styles.fill, width: `${pct}%` }} />
     </div>
   );
 }
@@ -255,12 +281,25 @@ const styles = {
   nextMeta: { fontSize: font.small, color: 'var(--textMuted)' },
   resume: {
     display: 'flex',
-    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 'clamp(1rem, 0.5rem + 2vw, 2rem)',
+    flexWrap: 'wrap',
     marginTop: '1.25rem',
-    padding: '1.25rem',
+    padding: 'clamp(1.25rem, 1rem + 1vw, 1.75rem)',
     background: 'var(--surface)',
     border: '1px solid var(--border)',
     borderRadius: radius.md,
+    boxShadow: 'var(--shadowSm)',
+  },
+  resumeBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    // Claims the row beside the ring, but wraps under it when space runs out
+    // rather than squeezing the title to one word per line.
+    flex: '1 1 260px',
+    minWidth: 0,
   },
   resumeTitle: {
     marginTop: '0.35rem',
@@ -269,13 +308,18 @@ const styles = {
     fontWeight: 600,
     color: 'var(--text)',
   },
+  resumeMeta: {
+    marginTop: '0.3rem',
+    fontSize: font.small,
+    color: 'var(--textMuted)',
+  },
   cta: {
     marginTop: '1rem',
     alignSelf: 'flex-start',
     padding: '0.55rem 1rem',
     borderRadius: radius.sm,
     background: 'var(--primary)',
-    color: '#fff',
+    color: 'var(--onPrimary)',
     fontSize: font.small,
     fontWeight: 600,
     textDecoration: 'none',
@@ -301,6 +345,13 @@ const styles = {
     border: '1px solid var(--border)',
     borderRadius: radius.md,
   },
+  cardHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '0.75rem',
+    marginBottom: '1rem',
+  },
   cardTitle: {
     fontFamily: 'var(--font-display), system-ui, sans-serif',
     fontSize: '1.05rem',
@@ -311,23 +362,6 @@ const styles = {
     marginTop: '0.15rem',
     fontSize: font.small,
     color: 'var(--textFaint)',
-  },
-  track: {
-    height: 8,
-    marginTop: '1rem',
-    borderRadius: 999,
-    background: 'var(--surfaceHover)',
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: 999,
-    background: 'var(--primary)',
-  },
-  pct: {
-    marginTop: '0.5rem',
-    fontSize: font.small,
-    color: 'var(--textMuted)',
   },
   gates: {
     display: 'flex',

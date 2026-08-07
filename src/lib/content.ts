@@ -84,7 +84,7 @@ export const hero = {
   /** Front-loads the primary keywords for both crawlers and skim-readers. */
   sub: 'Cyconet is a cybersecurity academy and tech school, a solutions agency, and a co-working tech hub — in one building. Train with engineers who still ship, hire us to build it, or take a desk beside the people who do.',
   primaryCta: { label: 'Explore Programs', href: '#programs' },
-  secondaryCta: { label: 'Talk to Admissions', href: '/apply' },
+  secondaryCta: { label: 'Enroll Now', href: '/register' },
   partners: ['Paystack', 'Flutterwave', 'Andela', 'Interswitch', 'Moniepoint'],
 } as const;
 
@@ -701,9 +701,46 @@ export const admissionSteps: Step[] = [
 ];
 
 /* ------------------------------------------------------------------ *
- * FAQ — also emitted as FAQPage structured data for rich results
+ * Tuition payment
  * ------------------------------------------------------------------ */
 
+/**
+ * Where students send tuition.
+ *
+ * Read from the environment with literal fallbacks, the same shape as
+ * SITE_URL above, so a deployment can point at a different account without a
+ * code change while local development still renders something sensible.
+ *
+ * These are deliberately NOT NEXT_PUBLIC_*: the values are only ever read in
+ * Server Components rendering the payment screen, so they need not be inlined
+ * into the client bundle.
+ */
+export const paymentDetails = {
+  bankName: process.env.BANK_NAME ?? 'Guaranty Trust Bank',
+  accountName: process.env.BANK_ACCOUNT_NAME ?? 'Cyconet Technologies Ltd',
+  accountNumber: process.env.BANK_ACCOUNT_NUMBER ?? '0123456789',
+  currency: 'NGN',
+} as const;
+
+/**
+ * Kobo → "₦450,000".
+ *
+ * Naira tuition is always a whole number of naira, so the minor unit is
+ * dropped when it is zero rather than padding every fee with a bare ".00".
+ */
+export function formatNaira(kobo: number): string {
+  const naira = kobo / 100;
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+    minimumFractionDigits: Number.isInteger(naira) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(naira);
+}
+
+/* ------------------------------------------------------------------ *
+ * FAQ — also emitted as FAQPage structured data for rich results
+ * ------------------------------------------------------------------ */
 export type Faq = { question: string; answer: string };
 
 export const faqs: Faq[] = [

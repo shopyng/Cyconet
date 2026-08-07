@@ -72,6 +72,15 @@ export default async function VerifyPage({
               </Link>{' '}
               — cybersecurity academy, tech school and solutions agency.
             </p>
+
+            {/*
+              A plain <a download>, not a Link: the response is a file, and the
+              client router would try to navigate to it. No `.pdf` in the path —
+              the proxy's matcher skips any path containing a dot.
+            */}
+            <a href={`/verify/${certificate.code}/download`} style={styles.download} download>
+              <span aria-hidden="true">↓</span> Download certificate (PDF)
+            </a>
           </>
         ) : (
           <>
@@ -216,6 +225,22 @@ const styles = {
   },
   issuerLink: {
     color: color.cyan,
+    textDecoration: 'none',
+  },
+  download: {
+    display: 'inline-flex',
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    gap: '0.5rem',
+    marginTop: '1.5rem',
+    padding: '0.75rem 1.35rem',
+    borderRadius: radius.md,
+    // Ink on the bright brand gradient — the same accessible pairing the
+    // marketing buttons use. See gradient.cta in src/lib/theme.ts.
+    background: gradient.cta,
+    color: color.ink,
+    fontSize: font.small,
+    fontWeight: 700,
     textDecoration: 'none',
   },
   notFoundBody: {

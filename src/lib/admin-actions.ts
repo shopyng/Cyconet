@@ -573,7 +573,7 @@ export async function issueManualCertificate(
   const certificate = await db.$transaction(async (tx) => {
     const created = await tx.certificate.create({
       data: {
-        userId: userId || undefined,
+        ...(userId ? { userId } : {}),
         programId,
         holderName,
         issuedAt,
@@ -632,6 +632,51 @@ export async function issueManualCertificate(
     status: 'success',
     message: `Certificate issued to ${holderName}. Verification code: ${certificate.verificationCode}`,
   };
+}
+
+/** Correct the printed issue date without changing the certificate identity. */
+export async function updateCertificateIssuedAt(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifyAdmin();
+  const id = fieldValue(formData, 'certificateId');
+  const issuedAt = parseCertificateDate(fieldValue(formData, 'issuedAt'));
+
+  if (!id) {
+    return { status: 'error', message: 'That certificate could not be identified.' };
+  }
+  if (!issuedAt) {
+    return {
+      status: 'error',
+      message: 'Enter a valid certificate date.',
+      errors: { issuedAt: 'Use a valid date.' },
+    };
+  }
+
+  const certificate = await db.certificate.findUnique({
+    where: { id },
+    select: { id: true, verificationCode: true },
+  });
+  if (!certificate) {
+    return { status: 'error', message: 'That certificate no longer exists.' };
+  }
+
+  await db.certificate.update({
+    where: { id: certificate.id },
+    data: { issuedAt },
+  });
+  await audit(admin.id, 'certificate.date_updated', 'Certificate', certificate.id, {
+    issuedAt: issuedAt.toISOString(),
+    verificationCode: certificate.verificationCode,
+  });
+
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+  revalidatePath(`/verify/${certificate.verificationCode}`);
+  revalidatePath(`/verify/${certificate.verificationCode}/download`);
+
+  return { status: 'success', message: 'Certificate issue date updated.' };
 }
 
 /* ------------------------------------------------------------------ *

@@ -2,13 +2,13 @@ import { allCertificates, allStudents, certificateCandidates, programOptions } f
 import { issueCertificate } from '@/lib/admin-actions';
 import { ActionButton } from '@/components/app/ActionForms';
 import CertificateIssueForm from '@/components/app/CertificateIssueForm';
+import CertificateDateForm from '@/components/app/CertificateDateForm';
 import {
   PageTitle,
   Card,
   EmptyState,
   Badge,
   Section,
-  formatDate,
 } from '@/components/app/Primitives';
 import { font } from '@/lib/theme';
 import type { Metadata } from 'next';
@@ -135,7 +135,10 @@ export default async function CertificatesPage() {
                     <a href={`/verify/${certificate.verificationCode}`} style={styles.code}>
                       {certificate.verificationCode}
                     </a>
-                    <span style={styles.right}>{formatDate(certificate.issuedAt)}</span>
+                  <CertificateDateForm
+                    certificateId={certificate.id}
+                    defaultDate={certificate.issuedAt.toISOString().slice(0, 10)}
+                  />
                   </li>
                 );
               })}

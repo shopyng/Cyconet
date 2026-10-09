@@ -346,7 +346,10 @@ const SIGNATURE_FILE_SIGNATURES: readonly {
 ];
 
 type SignatureUpload = {
-  data: Buffer;
+  // Prisma 7's Bytes input is an ArrayBuffer-backed Uint8Array. Keep the
+  // upload in that shape instead of widening it to Node's Buffer type, whose
+  // backing buffer is typed as ArrayBufferLike under newer TypeScript libs.
+  data: Uint8Array<ArrayBuffer>;
   mimeType: 'image/png' | 'image/jpeg';
   fileName: string;
   size: number;
@@ -390,7 +393,7 @@ async function readSignatureUpload(
   return {
     success: true,
     upload: {
-      data: Buffer.from(bytes),
+      data: bytes.slice(),
       mimeType,
       fileName: signatureFileName(file.name),
       size: bytes.byteLength,

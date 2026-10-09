@@ -132,7 +132,7 @@ export async function uploadPaymentProof(
     await tx.paymentProof.create({
       data: {
         paymentId: payment.id,
-        data: Buffer.from(bytes),
+        data: bytes.slice(),
         mimeType,
         fileName: safeFileName(file.name),
         size: bytes.byteLength,

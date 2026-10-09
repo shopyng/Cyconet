@@ -223,7 +223,7 @@ function drawCodewords(
           bitIndex < codewords.length * 8 &&
           ((codewords[bitIndex >>> 3] >>> (7 - (bitIndex & 7))) & 1) !== 0;
         bitIndex += 1;
-        modules[y][x] = dark ^ maskCondition(mask, x, y);
+        modules[y][x] = dark !== maskCondition(mask, x, y);
       }
     }
   }

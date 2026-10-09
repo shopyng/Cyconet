@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { certificateByCode } from '@/lib/dal';
+import { apexUrl, currentTenant } from '@/lib/tenant';
 import { color, font, glass, gradient, radius } from '@/lib/theme';
 import type { Metadata } from 'next';
 
@@ -24,10 +25,11 @@ export default async function VerifyPage({
   const { code } = await params;
 
   const certificate = await certificateByCode(code.toUpperCase());
+  const homeHref = (await currentTenant()) === 'admin' ? await apexUrl('/') : '/';
 
   return (
     <div style={styles.page}>
-      <Link href="/" style={styles.home}>← cyconet.ng</Link>
+      <Link href={homeHref} style={styles.home}>← cyconet.ng</Link>
 
       <div style={styles.card}>
         {certificate ? (
@@ -67,7 +69,7 @@ export default async function VerifyPage({
 
             <p style={styles.issuer}>
               Issued by{' '}
-              <Link href="/" style={styles.issuerLink}>
+              <Link href={homeHref} style={styles.issuerLink}>
                 Cyconet
               </Link>{' '}
               — cybersecurity academy, tech school and solutions agency.
@@ -95,7 +97,7 @@ export default async function VerifyPage({
 
             <p style={styles.notFoundBody}>
               Double-check the code on the certificate. If it still does not resolve, contact{' '}
-              <Link href="/" style={styles.issuerLink}>
+                <Link href={homeHref} style={styles.issuerLink}>
                 Cyconet
               </Link>{' '}
               directly to verify the credential.

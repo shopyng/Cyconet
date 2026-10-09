@@ -1,6 +1,7 @@
-import { allCertificates, certificateCandidates } from '@/lib/dal';
+import { allCertificates, allStudents, certificateCandidates, programOptions } from '@/lib/dal';
 import { issueCertificate } from '@/lib/admin-actions';
 import { ActionButton } from '@/components/app/ActionForms';
+import CertificateIssueForm from '@/components/app/CertificateIssueForm';
 import {
   PageTitle,
   Card,
@@ -22,7 +23,12 @@ export const metadata: Metadata = { title: 'Certificates' };
  * progress page.
  */
 export default async function CertificatesPage() {
-  const [issued, candidates] = await Promise.all([allCertificates(), certificateCandidates()]);
+  const [issued, candidates, students, programs] = await Promise.all([
+    allCertificates(),
+    certificateCandidates(),
+    allStudents(),
+    programOptions(),
+  ]);
 
   return (
     <>
@@ -34,6 +40,30 @@ export default async function CertificatesPage() {
             : 'No students are currently awaiting a certificate.'
         }
       />
+
+      <Section
+        title="Issue manually"
+        description="Create a verified certificate for a student who was assessed outside the online course. Course eligibility is not required here."
+      >
+        {students.length === 0 || programs.length === 0 ? (
+          <Card>
+            <p style={styles.muted}>
+              Add at least one student and one programme before issuing a certificate.
+            </p>
+          </Card>
+        ) : (
+          <Card>
+            <CertificateIssueForm
+              students={students.map((student) => ({
+                value: student.id,
+                label: `${student.name} · ${student.email}`,
+              }))}
+              programs={programs.map((program) => ({ value: program.id, label: program.title }))}
+              defaultDate={new Date().toISOString().slice(0, 10)}
+            />
+          </Card>
+        )}
+      </Section>
 
       <Section
         title="Ready to issue"

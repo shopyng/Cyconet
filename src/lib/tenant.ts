@@ -13,9 +13,9 @@ import { headers } from 'next/headers';
  *      needed, and `x-pathname` reports the same form so nav highlighting matches.
  *
  *   2. Links that cross hosts cannot be paths at all. A student bounced off the
- *      admin host belongs on learning.<root>, and /verify/<code> only exists on
- *      the apex. A relative path would resolve against the wrong host and 404,
- *      so these need absolute URLs — which is what this module builds.
+ *      admin host belongs on learning.<root>. The canonical /verify/<code> URL
+ *      lives on the apex, although the admin tenant also exposes a public alias
+ *      so copied admin-host links remain verifiable.
  */
 
 export type Tenant = 'learning' | 'admin';

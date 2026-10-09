@@ -29,7 +29,7 @@ for (const testCase of CASES) {
     programDuration: '14 weeks',
     issuedAt: new Date('2026-08-07T00:00:00Z'),
     verificationCode: 'K7M2QW9XZ4',
-    verifyUrl: 'cyconet.ng/verify/K7M2QW9XZ4',
+    verifyUrl: 'https://cyconet.ng/verify/K7M2QW9XZ4',
   });
   fs.writeFileSync(testCase.file, bytes);
 
@@ -79,4 +79,3 @@ if (failures > 0) {
   process.exit(1);
 }
 console.log('\nAll checks passed.');
-

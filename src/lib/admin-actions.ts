@@ -335,6 +335,60 @@ export async function reviewSubmission(
  * Certificates
  * ------------------------------------------------------------------ */
 
+const MAX_SIGNATURE_BYTES = 1 * 1024 * 1024;
+
+const SIGNATURE_FILE_SIGNATURES: readonly {
+  mime: 'image/png' | 'image/jpeg';
+  magic: readonly number[];
+}[] = [
+  { mime: 'image/png', magic: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+  { mime: 'image/jpeg', magic: [0xff, 0xd8, 0xff] },
+];
+
+function sniffSignatureMime(bytes: Uint8Array): 'image/png' | 'image/jpeg' | null {
+  for (const signature of SIGNATURE_FILE_SIGNATURES) {
+    if (signature.magic.every((byte, index) => bytes[index] === byte)) return signature.mime;
+  }
+  return null;
+}
+
+function signatureFileName(raw: string): string {
+  const base = raw.split(/[\\/]/).pop() ?? 'signature';
+  const cleaned = base.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
+  return cleaned || 'signature';
+}
+
+async function readSignatureUpload(formData: FormData, field: string) {
+  const file = formData.get(field);
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: 'Upload both the director and student signature images.' } as const;
+  }
+  if (file.size > MAX_SIGNATURE_BYTES) {
+    return { error: 'Each signature image must be 1MB or smaller.' } as const;
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const mimeType = sniffSignatureMime(bytes);
+  if (!mimeType) {
+    return { error: 'Signatures must be PNG or JPEG images.' } as const;
+  }
+
+  return {
+    upload: {
+      data: Buffer.from(bytes),
+      mimeType,
+      fileName: signatureFileName(file.name),
+      size: bytes.byteLength,
+    },
+  } as const;
+}
+
+function parseCertificateDate(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T12:00:00.000Z`);
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? null : date;
+}
+
 /**
  * Issue a certificate.
  *
@@ -414,6 +468,120 @@ export async function issueCertificate(
   return {
     status: 'success',
     message: `Certificate issued to ${student.name} for ${program.title}. Verification code: ${certificate.verificationCode}`,
+  };
+}
+
+/**
+ * Issue a certificate manually. This intentionally does not call
+ * `eligibility()`: staff can certify an offline, classroom, private or
+ * otherwise externally assessed student who has no course activity here.
+ */
+export async function issueManualCertificate(
+  _prevState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await verifyAdmin();
+  const userId = fieldValue(formData, 'userId');
+  const programId = fieldValue(formData, 'programId');
+  const issuedAt = parseCertificateDate(fieldValue(formData, 'issuedAt'));
+
+  if (!userId || !programId) {
+    return { status: 'error', message: 'Choose a student and programme.' };
+  }
+  if (!issuedAt) {
+    return {
+      status: 'error',
+      message: 'Enter a valid certificate date.',
+      errors: { issuedAt: 'Use a valid date.' },
+    };
+  }
+
+  const [student, program, existing] = await Promise.all([
+    db.user.findFirst({
+      where: { id: userId, role: 'STUDENT' },
+      select: { id: true, name: true, email: true },
+    }),
+    db.program.findUnique({
+      where: { id: programId },
+      select: { id: true, title: true },
+    }),
+    db.certificate.findUnique({
+      where: { userId_programId: { userId, programId } },
+      select: { verificationCode: true },
+    }),
+  ]);
+
+  if (!student || !program) {
+    return { status: 'error', message: 'Unknown student or programme.' };
+  }
+  if (existing) {
+    return {
+      status: 'error',
+      message: `A certificate already exists for this student and programme — code ${existing.verificationCode}.`,
+    };
+  }
+
+  const [director, studentSignature] = await Promise.all([
+    readSignatureUpload(formData, 'directorSignature'),
+    readSignatureUpload(formData, 'studentSignature'),
+  ]);
+  if ('error' in director) {
+    return { status: 'error', message: director.error, errors: { directorSignature: director.error } };
+  }
+  if ('error' in studentSignature) {
+    return { status: 'error', message: studentSignature.error, errors: { studentSignature: studentSignature.error } };
+  }
+
+  const certificate = await db.$transaction(async (tx) => {
+    const created = await tx.certificate.create({
+      data: { userId, programId, issuedAt, verificationCode: verificationCode() },
+    });
+
+    await tx.certificateSignature.createMany({
+      data: [
+        { certificateId: created.id, kind: 'DIRECTOR', ...director.upload },
+        { certificateId: created.id, kind: 'STUDENT', ...studentSignature.upload },
+      ],
+    });
+
+    await tx.notification.create({
+      data: {
+        userId,
+        title: 'Certificate issued',
+        body: `Your certificate for ${program.title} is ready.`,
+        href: '/certificate',
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: 'certificate.issued_manually',
+        entity: 'Certificate',
+        entityId: created.id,
+        metadata: {
+          userId,
+          programId,
+          verificationCode: created.verificationCode,
+          issuedAt: issuedAt.toISOString(),
+        },
+      },
+    });
+
+    return created;
+  });
+
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/learning', 'layout');
+
+  await tryEmail(
+    student.email,
+    'Your Cyconet certificate is ready',
+    `Hello ${student.name},\n\nYour certificate for ${program.title} has been issued.\n\nVerification code: ${certificate.verificationCode}\n\nRegards,\nCyconet`,
+  );
+
+  return {
+    status: 'success',
+    message: `Certificate issued to ${student.name}. Verification code: ${certificate.verificationCode}`,
   };
 }
 

@@ -1,9 +1,9 @@
 /**
  * A minimal PDF writer.
  *
- * Enough of PDF 1.4 to lay out a certificate: filled rectangles, lines, and
- * text positioned absolutely. No dependencies, no font binaries, no headless
- * browser — it emits the bytes directly.
+ * Enough of PDF 1.4 to lay out a certificate: filled rectangles, lines, images
+ * and text positioned absolutely. No third-party dependencies, no font
+ * binaries, no headless browser — it emits the bytes directly.
  *
  * Two things make that practical:
  *
@@ -22,12 +22,28 @@
  */
 
 import { stringWidth, type FontName } from './pdf-metrics';
+import { deflateSync, inflateSync } from 'node:zlib';
 
 export type { FontName };
 
 export type Rgb = readonly [number, number, number];
 
+export type PdfImage = {
+  data: Uint8Array;
+  mimeType: 'image/png' | 'image/jpeg';
+};
+
 type Op = string;
+
+type ImagePlacement = {
+  image: PdfImage;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+const MAX_IMAGE_PIXELS = 4_000_000;
 
 /** Points per unit for the two page sizes we care about. */
 export const PAGE = {
@@ -111,6 +127,7 @@ export class Page {
   readonly height: number;
   private ops: Op[] = [];
   private fonts = new Set<FontName>();
+  private images: ImagePlacement[] = [];
 
   constructor(size: { width: number; height: number }) {
     this.width = size.width;
@@ -155,6 +172,25 @@ export class Page {
       `${fmt(x1)} ${fmt(y1)} m ${fmt(x2)} ${fmt(y2)} l S`,
       'Q',
     );
+    return this;
+  }
+
+  /** Draws an uploaded signature image into the given box. */
+  image(image: PdfImage, x: number, y: number, width: number, height: number): this {
+    this.images.push({ image, x, y, width, height });
+    return this;
+  }
+
+  /** Draws a QR matrix as vector squares, so it remains sharp when printed. */
+  qr(matrix: readonly (readonly boolean[])[], x: number, y: number, size: number, color: Rgb): this {
+    const moduleSize = size / matrix.length;
+    for (let row = 0; row < matrix.length; row += 1) {
+      for (let column = 0; column < matrix[row].length; column += 1) {
+        if (matrix[row][column]) {
+          this.rect(x + column * moduleSize, y + size - (row + 1) * moduleSize, moduleSize, moduleSize, color);
+        }
+      }
+    }
     return this;
   }
 
@@ -221,8 +257,23 @@ export class Page {
   }
 
   /** @internal */
-  content(): string {
-    return this.ops.join('\n');
+  usedImages(): readonly ImagePlacement[] {
+    return this.images;
+  }
+
+  /** @internal */
+  content(imageNames: ReadonlyMap<ImagePlacement, string> = new Map()): string {
+    const imageOps = this.images.map((placement) => {
+      const name = imageNames.get(placement);
+      if (!name) throw new Error('PDF image resource was not registered.');
+      return [
+        'q',
+        `${fmt(placement.width)} 0 0 ${fmt(placement.height)} ${fmt(placement.x)} ${fmt(placement.y)} cm`,
+        `/${name} Do`,
+        'Q',
+      ].join('\n');
+    });
+    return [...this.ops, ...imageOps].join('\n');
   }
 }
 
@@ -287,17 +338,56 @@ export class PdfDocument {
       .map(([name, num]) => `/${name} ${num} 0 R`)
       .join(' ');
 
+    const imageNames = new Map<ImagePlacement, string>();
+    const imageNums = new Map<string, number>();
+    let imageIndex = 0;
+
+    for (const page of this.pages) {
+      for (const placement of page.usedImages()) {
+        const name = `Im${++imageIndex}`;
+        const prepared = prepareImage(placement.image);
+        const alphaNum = prepared.alpha
+          ? addImageObject({
+              width: prepared.width,
+              height: prepared.height,
+              colorSpace: '/DeviceGray',
+              data: prepared.alpha,
+              filter: '/FlateDecode',
+            }, add)
+          : null;
+        const imageNum = addImageObject(
+          {
+            width: prepared.width,
+            height: prepared.height,
+            colorSpace: prepared.colorSpace,
+            data: prepared.data,
+            filter: prepared.filter,
+            alphaNum,
+          },
+          add,
+        );
+        imageNames.set(placement, name);
+        imageNums.set(name, imageNum);
+      }
+    }
+
+    const imageResource = [...imageNums.entries()]
+      .map(([name, num]) => `/${name} ${num} 0 R`)
+      .join(' ');
+
     const pageNums: number[] = [];
     for (const page of this.pages) {
-      const stream = page.content();
+      const stream = page.content(imageNames);
       const contentNum = add(
         `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
       );
+      const resources = [`/Font << ${fontResource} >>`];
+      if (imageResource) resources.push(`/XObject << ${imageResource} >>`);
       pageNums.push(
         add(
           `<< /Type /Page /Parent ${pagesNum} 0 R ` +
             `/MediaBox [0 0 ${fmt(page.width)} ${fmt(page.height)}] ` +
-            `/Resources << /Font << ${fontResource} >> >> ` +
+            `/Resources << ${resources.join(' ')} >> ` +
             `/Contents ${contentNum} 0 R >>`,
         ),
       );
@@ -351,4 +441,242 @@ export class PdfDocument {
     for (let i = 0; i < out.length; i += 1) bytes[i] = out.charCodeAt(i) & 0xff;
     return bytes;
   }
+}
+
+type PreparedImage = {
+  width: number;
+  height: number;
+  colorSpace: string;
+  data: Uint8Array;
+  filter: string;
+  alpha?: Uint8Array;
+};
+
+function addImageObject(
+  image: {
+    width: number;
+    height: number;
+    colorSpace: string;
+    data: Uint8Array;
+    filter: string;
+    alphaNum?: number | null;
+  },
+  add: (body: string) => number,
+): number {
+  const parts = [
+    '<< /Type /XObject /Subtype /Image',
+    `/Width ${image.width}`,
+    `/Height ${image.height}`,
+    `/ColorSpace ${image.colorSpace}`,
+    '/BitsPerComponent 8',
+    `/Filter ${image.filter}`,
+  ];
+  if (image.alphaNum) parts.push(`/SMask ${image.alphaNum} 0 R`);
+  parts.push(`/Length ${image.data.byteLength} >>`);
+  return add(`${parts.join(' ')}\nstream\n${latin1(image.data)}\nendstream`);
+}
+
+function latin1(data: Uint8Array): string {
+  let result = '';
+  // Chunking prevents a large signature upload from overflowing the argument
+  // limit of String.fromCharCode.apply.
+  for (let offset = 0; offset < data.length; offset += 0x8000) {
+    const chunk = data.subarray(offset, offset + 0x8000);
+    result += String.fromCharCode(...chunk);
+  }
+  return result;
+}
+
+function prepareImage(image: PdfImage): PreparedImage {
+  if (image.mimeType === 'image/jpeg') return prepareJpeg(image.data);
+  return preparePng(image.data);
+}
+
+function prepareJpeg(data: Uint8Array): PreparedImage {
+  if (data[0] !== 0xff || data[1] !== 0xd8) throw new Error('Invalid JPEG signature.');
+
+  let offset = 2;
+  while (offset + 8 < data.length) {
+    while (offset < data.length && data[offset] !== 0xff) offset += 1;
+    while (offset < data.length && data[offset] === 0xff) offset += 1;
+    const marker = data[offset++];
+    if (marker === undefined) break;
+    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    const length = readUint16(data, offset);
+    if (!length || offset + length > data.length) break;
+
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      const height = readUint16(data, offset + 3);
+      const width = readUint16(data, offset + 5);
+      const components = data[offset + 7] ?? 3;
+      if (!width || !height || width * height > MAX_IMAGE_PIXELS) {
+        throw new Error('Signature image dimensions are too large.');
+      }
+      const colorSpace = components === 1 ? '/DeviceGray' : components === 4 ? '/DeviceCMYK' : '/DeviceRGB';
+      return { width, height, colorSpace, data, filter: '/DCTDecode' };
+    }
+    offset += length;
+  }
+  throw new Error('JPEG dimensions could not be read.');
+}
+
+function preparePng(data: Uint8Array): PreparedImage {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (!signature.every((byte, index) => data[index] === byte)) {
+    throw new Error('Invalid PNG signature.');
+  }
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlace = 0;
+  let palette: Uint8Array | undefined;
+  let transparency: Uint8Array | undefined;
+  const idat: Uint8Array[] = [];
+
+  while (offset + 12 <= data.length) {
+    const length = readUint32(data, offset);
+    const type = String.fromCharCode(...data.subarray(offset + 4, offset + 8));
+    const chunk = data.subarray(offset + 8, offset + 8 + length);
+    offset += 12 + length;
+    if (type === 'IHDR') {
+      width = readUint32(chunk, 0);
+      height = readUint32(chunk, 4);
+      bitDepth = chunk[8] ?? 0;
+      colorType = chunk[9] ?? 0;
+      interlace = chunk[12] ?? 0;
+    } else if (type === 'IDAT') {
+      idat.push(chunk);
+    } else if (type === 'PLTE') {
+      palette = chunk;
+    } else if (type === 'tRNS') {
+      transparency = chunk;
+    } else if (type === 'IEND') {
+      break;
+    }
+  }
+
+  const bytesPerPixel =
+    colorType === 6 ? 4 : colorType === 2 ? 3 : colorType === 4 ? 2 : colorType === 3 || colorType === 0 ? 1 : 0;
+  if (
+    !width ||
+    !height ||
+    bitDepth !== 8 ||
+    !bytesPerPixel ||
+    interlace !== 0 ||
+    idat.length === 0 ||
+    (colorType === 3 && (!palette || palette.length < 3)) ||
+    width * height > MAX_IMAGE_PIXELS
+  ) {
+    throw new Error('Only non-interlaced 8-bit RGB/RGBA PNG signatures are supported.');
+  }
+
+  const compressed = joinBytes(idat);
+  const filtered = new Uint8Array(inflateSync(Buffer.from(compressed)));
+  const stride = width * bytesPerPixel;
+  const pixels = new Uint8Array(height * stride);
+  let sourceOffset = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = filtered[sourceOffset++];
+    const rowStart = y * stride;
+    for (let x = 0; x < stride; x += 1) {
+      const raw = filtered[sourceOffset++];
+      const left = x >= bytesPerPixel ? pixels[rowStart + x - bytesPerPixel] : 0;
+      const up = y > 0 ? pixels[rowStart - stride + x] : 0;
+      const upperLeft = y > 0 && x >= bytesPerPixel ? pixels[rowStart - stride + x - bytesPerPixel] : 0;
+      pixels[rowStart + x] = unfilterByte(filter, raw, left, up, upperLeft);
+    }
+  }
+
+  const channels = colorType === 6 || colorType === 2 || colorType === 3 ? 3 : 1;
+  const rgb = new Uint8Array(width * height * channels);
+  const alpha =
+    colorType === 6 || colorType === 4 || (colorType === 3 && transparency)
+      ? new Uint8Array(width * height)
+      : undefined;
+  let rgbOffset = 0;
+  let alphaOffset = 0;
+  for (let i = 0; i < width * height; i += 1) {
+    const source = i * bytesPerPixel;
+    if (colorType === 6) {
+      rgb[rgbOffset++] = pixels[source];
+      rgb[rgbOffset++] = pixels[source + 1];
+      rgb[rgbOffset++] = pixels[source + 2];
+      if (alpha) alpha[alphaOffset++] = pixels[source + 3];
+    } else if (colorType === 4) {
+      rgb[rgbOffset++] = pixels[source];
+      if (alpha) alpha[alphaOffset++] = pixels[source + 1];
+    } else if (colorType === 3) {
+      const paletteIndex = pixels[source] * 3;
+      rgb[rgbOffset++] = palette?.[paletteIndex] ?? 0;
+      rgb[rgbOffset++] = palette?.[paletteIndex + 1] ?? 0;
+      rgb[rgbOffset++] = palette?.[paletteIndex + 2] ?? 0;
+      if (alpha) alpha[alphaOffset++] = transparency?.[pixels[source]] ?? 255;
+    } else if (colorType === 2) {
+      rgb[rgbOffset++] = pixels[source];
+      rgb[rgbOffset++] = pixels[source + 1];
+      rgb[rgbOffset++] = pixels[source + 2];
+    } else {
+      rgb[rgbOffset++] = pixels[source];
+    }
+  }
+
+  return {
+    width,
+    height,
+    colorSpace: channels === 3 ? '/DeviceRGB' : '/DeviceGray',
+    data: new Uint8Array(deflateSync(Buffer.from(rgb))),
+    filter: '/FlateDecode',
+    alpha: alpha ? new Uint8Array(deflateSync(Buffer.from(alpha))) : undefined,
+  };
+}
+
+function unfilterByte(filter: number | undefined, raw: number | undefined, left: number, up: number, upperLeft: number): number {
+  const value = raw ?? 0;
+  switch (filter) {
+    case 1:
+      return (value + left) & 0xff;
+    case 2:
+      return (value + up) & 0xff;
+    case 3:
+      return (value + Math.floor((left + up) / 2)) & 0xff;
+    case 4:
+      return (value + paeth(left, up, upperLeft)) & 0xff;
+    default:
+      return value;
+  }
+}
+
+function paeth(a: number, b: number, c: number): number {
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+}
+
+function joinBytes(chunks: readonly Uint8Array[]): Uint8Array {
+  const result = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
+function readUint16(data: Uint8Array, offset: number): number {
+  return ((data[offset] ?? 0) << 8) | (data[offset + 1] ?? 0);
+}
+
+function readUint32(data: Uint8Array, offset: number): number {
+  return (
+    ((data[offset] ?? 0) << 24) |
+    ((data[offset + 1] ?? 0) << 16) |
+    ((data[offset + 2] ?? 0) << 8) |
+    (data[offset + 3] ?? 0)
+  ) >>> 0;
 }

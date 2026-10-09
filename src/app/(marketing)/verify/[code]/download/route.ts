@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { certificateByCode } from '@/lib/dal';
+import { certificateForPdfByCode } from '@/lib/dal';
 import { apexUrl } from '@/lib/tenant';
 import { renderCertificatePdf, certificateFileName } from '@/lib/certificate-pdf';
 
@@ -8,8 +8,9 @@ import { renderCertificatePdf, certificateFileName } from '@/lib/certificate-pdf
  *
  * Deliberately unauthenticated, exactly like the /verify/[code] page beside it:
  * the whole purpose of a verification code is that a third party who has it can
- * check the credential. `certificateByCode` returns only what an employer needs
- * — holder, programme, dates, code — and nothing else about the student.
+ * check the credential. The PDF lookup returns only what an employer needs
+ * — holder, programme, dates, code and the chosen signatory artwork — and
+ * nothing else about the student.
  *
  * No `.pdf` in the path; see the note in the learning-side download route.
  */
@@ -20,7 +21,7 @@ export async function GET(
   context: { params: Promise<{ code: string }> },
 ) {
   const { code } = await context.params;
-  const certificate = await certificateByCode(code.toUpperCase());
+  const certificate = await certificateForPdfByCode(code.toUpperCase());
 
   if (!certificate) notFound();
 
@@ -30,7 +31,9 @@ export async function GET(
     programDuration: certificate.duration,
     issuedAt: certificate.issuedAt,
     verificationCode: certificate.code,
-    verifyUrl: (await apexUrl(`/verify/${certificate.code}`)).replace(/^https?:\/\//, ''),
+    verifyUrl: await apexUrl(`/verify/${certificate.code}`),
+    directorSignature: imageForSignature(certificate.signatures, 'DIRECTOR'),
+    studentSignature: imageForSignature(certificate.signatures, 'STUDENT'),
   });
 
   return new Response(pdf as BodyInit, {
@@ -46,4 +49,12 @@ export async function GET(
       'Cache-Control': 'public, max-age=300',
     },
   });
+}
+
+function imageForSignature(
+  signatures: readonly { kind: string; data: Uint8Array; mimeType: 'image/png' | 'image/jpeg' }[],
+  kind: 'DIRECTOR' | 'STUDENT',
+) {
+  const signature = signatures.find((entry) => entry.kind === kind);
+  return signature ? { data: signature.data, mimeType: signature.mimeType } : undefined;
 }

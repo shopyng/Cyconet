@@ -370,12 +370,39 @@ model Certificate {
   issuedAt         DateTime @default(now())
   verificationCode String   @unique
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program    Program                @relation(fields: [programId], references: [id], onDelete: Cascade)
+  signatures CertificateSignature[]
 
   @@unique([userId, programId])
   @@index([userId])
   @@index([programId])
+}
+
+/**
+ * Signature artwork is kept out of Certificate so certificate lists never
+ * pull image bytes out of Postgres. The PDF route joins these rows only when a
+ * certificate is actually downloaded.
+ */
+model CertificateSignature {
+  id            String                  @id @default(cuid())
+  certificateId String
+  kind          CertificateSignatureKind
+  data          Bytes
+  mimeType      String
+  fileName      String
+  size          Int
+  uploadedAt    DateTime                @default(now())
+
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+
+  @@unique([certificateId, kind])
+  @@index([certificateId])
+}
+
+enum CertificateSignatureKind {
+  DIRECTOR
+  STUDENT
 }
 
 // ============================================================================

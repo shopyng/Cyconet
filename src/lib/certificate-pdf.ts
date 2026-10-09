@@ -10,7 +10,8 @@
  * designed; PDF's own origin is bottom-left.
  */
 
-import { PdfDocument, PAGE, type Rgb } from './pdf';
+import { PdfDocument, PAGE, type PdfImage, type Rgb } from './pdf';
+import { makeQrMatrix } from './qr';
 
 /*
  * Print palette. The marketing cyan (#00E5FF) is deliberately not used: it
@@ -32,6 +33,8 @@ export type CertificateData = {
   verificationCode: string;
   /** Absolute URL a third party can check, e.g. https://cyconet.ng/verify/ABC. */
   verifyUrl: string;
+  directorSignature?: PdfImage;
+  studentSignature?: PdfImage;
 };
 
 function formatIssueDate(date: Date): string {
@@ -169,7 +172,20 @@ export function renderCertificatePdf(data: CertificateData): Uint8Array {
 
   const footY = 500;
   const leftX = 96;
-  const rightX = W - 96;
+  const qrSize = 76;
+  const qrX = W - 150;
+  const qrY = 49;
+
+  // Four-module quiet zone required by QR readers, kept white even if the
+  // surrounding certificate decoration is close to the code.
+  page.rect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, PAPER);
+  page.qr(makeQrMatrix(data.verifyUrl), qrX, qrY, qrSize, INK);
+  page.textCentered('SCAN TO VERIFY', qrX + qrSize / 2, fromTop(560), {
+    font: 'Helvetica-Bold',
+    size: 6.5,
+    color: MUTED,
+    charSpacing: 1.1,
+  });
 
   page.text('VERIFICATION CODE', leftX, fromTop(footY - 16), {
     font: 'Helvetica-Bold',
@@ -189,21 +205,27 @@ export function renderCertificatePdf(data: CertificateData): Uint8Array {
     color: MUTED,
   });
 
-  // Signature block, right-aligned against the same optical margin.
-  page.line(rightX - 190, fromTop(footY - 2), rightX, fromTop(footY - 2), MUTED, 0.8);
-  page.textRight('Cyconet Academy', rightX, fromTop(footY - 8), {
-    font: 'Times-Italic',
-    size: 13,
-    color: INK,
-  });
-  page.textRight('Director of Studies', rightX, fromTop(footY + 12), {
-    font: 'Helvetica',
-    size: 8,
-    color: MUTED,
-    charSpacing: 0.8,
-  });
+  drawSignature(page, data.directorSignature, 465, 96, 'Director');
+  drawSignature(page, data.studentSignature, 575, 96, 'Student');
 
   return doc.build();
+}
+
+function drawSignature(
+  page: ReturnType<PdfDocument['addPage']>,
+  signature: PdfImage | undefined,
+  x: number,
+  width: number,
+  label: string,
+): void {
+  if (signature) page.image(signature, x, 109, width, 30);
+  page.line(x, 105, x + width, 105, MUTED, 0.8);
+  page.textCentered(label, x + width / 2, 84, {
+    font: 'Helvetica',
+    size: 7.5,
+    color: MUTED,
+    charSpacing: 0.6,
+  });
 }
 
 /** Filename offered to the browser. Safe for every OS: ASCII, no spaces. */

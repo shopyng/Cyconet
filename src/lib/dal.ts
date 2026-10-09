@@ -893,3 +893,33 @@ export async function certificateByCode(code: string) {
     code: certificate.verificationCode,
   };
 }
+
+/**
+ * Certificate lookup for the public PDF route. Signature artwork is included
+ * only for this explicit download path; the verification page and admin lists
+ * continue to receive metadata only.
+ */
+export async function certificateForPdfByCode(code: string) {
+  const certificate = await db.certificate.findUnique({
+    where: { verificationCode: code },
+    include: {
+      user: { select: { name: true } },
+      program: { select: { title: true, duration: true } },
+      signatures: { select: { kind: true, data: true, mimeType: true } },
+    },
+  });
+  if (!certificate) return null;
+
+  return {
+    holder: certificate.user.name,
+    program: certificate.program.title,
+    duration: certificate.program.duration,
+    issuedAt: certificate.issuedAt,
+    code: certificate.verificationCode,
+    signatures: certificate.signatures.map((signature) => ({
+      kind: signature.kind,
+      data: new Uint8Array(signature.data),
+      mimeType: signature.mimeType as 'image/png' | 'image/jpeg',
+    })),
+  };
+}

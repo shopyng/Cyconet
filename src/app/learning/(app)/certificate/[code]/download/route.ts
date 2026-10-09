@@ -36,6 +36,7 @@ export async function GET(
     include: {
       user: { select: { name: true } },
       program: { select: { title: true, duration: true } },
+      signatures: { select: { kind: true, data: true, mimeType: true } },
     },
   });
 
@@ -47,10 +48,9 @@ export async function GET(
     programDuration: certificate.program.duration,
     issuedAt: certificate.issuedAt,
     verificationCode: certificate.verificationCode,
-    verifyUrl: (await apexUrl(`/verify/${certificate.verificationCode}`)).replace(
-      /^https?:\/\//,
-      '',
-    ),
+    verifyUrl: await apexUrl(`/verify/${certificate.verificationCode}`),
+    directorSignature: imageForSignature(certificate.signatures, 'DIRECTOR'),
+    studentSignature: imageForSignature(certificate.signatures, 'STUDENT'),
   });
 
   return new Response(pdf as BodyInit, {
@@ -64,4 +64,14 @@ export async function GET(
       'Cache-Control': 'private, no-store',
     },
   });
+}
+
+function imageForSignature(
+  signatures: readonly { kind: string; data: Uint8Array | Buffer; mimeType: string }[],
+  kind: 'DIRECTOR' | 'STUDENT',
+) {
+  const signature = signatures.find((entry) => entry.kind === kind);
+  if (!signature) return undefined;
+  if (signature.mimeType !== 'image/png' && signature.mimeType !== 'image/jpeg') return undefined;
+  return { data: new Uint8Array(signature.data), mimeType: signature.mimeType };
 }

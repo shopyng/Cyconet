@@ -45,11 +45,9 @@ export default async function CertificatesPage() {
         title="Issue manually"
         description="Create a verified certificate for a student who was assessed outside the online course. Course eligibility is not required here."
       >
-        {students.length === 0 || programs.length === 0 ? (
+        {programs.length === 0 ? (
           <Card>
-            <p style={styles.muted}>
-              Add at least one student and one programme before issuing a certificate.
-            </p>
+            <p style={styles.muted}>Add at least one programme before issuing a certificate.</p>
           </Card>
         ) : (
           <Card>
@@ -115,24 +113,32 @@ export default async function CertificatesPage() {
         ) : (
           <Card>
             <ul style={styles.plainList}>
-              {issued.map((certificate) => (
-                <li key={certificate.id} style={styles.plainItem}>
-                  <div style={styles.certMain}>
-                    <a href={`/students/${certificate.userId}`} style={styles.link}>
-                      {certificate.user.name}
+              {issued.map((certificate) => {
+                const holderName =
+                  certificate.holderName ?? certificate.user?.name ?? 'Certificate holder';
+                return (
+                  <li key={certificate.id} style={styles.plainItem}>
+                    <div style={styles.certMain}>
+                      {certificate.user ? (
+                        <a href={`/students/${certificate.user.id}`} style={styles.link}>
+                          {holderName}
+                        </a>
+                      ) : (
+                        <span style={styles.link}>{holderName}</span>
+                      )}
+                      <span style={styles.sub}>{certificate.program.title}</span>
+                    </div>
+                    {/*
+                      The code links to the public verification page — the same URL
+                      an employer would use, so staff can confirm it resolves.
+                    */}
+                    <a href={`/verify/${certificate.verificationCode}`} style={styles.code}>
+                      {certificate.verificationCode}
                     </a>
-                    <span style={styles.sub}>{certificate.program.title}</span>
-                  </div>
-                  {/*
-                    The code links to the public verification page — the same URL
-                    an employer would use, so staff can confirm it resolves.
-                  */}
-                  <a href={`/verify/${certificate.verificationCode}`} style={styles.code}>
-                    {certificate.verificationCode}
-                  </a>
-                  <span style={styles.right}>{formatDate(certificate.issuedAt)}</span>
-                </li>
-              ))}
+                    <span style={styles.right}>{formatDate(certificate.issuedAt)}</span>
+                  </li>
+                );
+              })}
             </ul>
           </Card>
         )}

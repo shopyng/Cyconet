@@ -365,12 +365,13 @@ enum SubmissionStatus {
 
 model Certificate {
   id               String   @id @default(cuid())
-  userId           String
+  userId           String?
   programId        String
+  holderName       String?
   issuedAt         DateTime @default(now())
   verificationCode String   @unique
 
-  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   program    Program                @relation(fields: [programId], references: [id], onDelete: Cascade)
   signatures CertificateSignature[]
 

@@ -79,7 +79,7 @@ export default async function CertificatePage() {
                 </div>
 
                 <p style={styles.certAwarded}>This is to certify that</p>
-                <p style={styles.certHolder}>{user.name}</p>
+                <p style={styles.certHolder}>{certificate.holderName ?? user.name}</p>
                 <p style={styles.certAwarded}>has successfully completed</p>
                 <h3 style={styles.certTitle}>{certificate.program.title}</h3>
 

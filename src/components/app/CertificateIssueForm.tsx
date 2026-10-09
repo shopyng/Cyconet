@@ -30,13 +30,19 @@ export default function CertificateIssueForm({
       {done ? null : (
         <>
           <div style={styles.grid}>
+            <TextField
+              name="holderName"
+              label="Student name"
+              required
+              error={state.errors?.holderName}
+              hint="Type the name exactly as it should appear on the certificate."
+            />
             <SelectField
               name="userId"
-              label="Student"
+              label="Link to existing student account"
               options={students}
-              required
               error={state.errors?.userId}
-              hint="This can be a student without an online-course enrolment."
+              hint="Optional. Leave this empty for an externally assessed student without an online account."
             />
             <SelectField
               name="programId"

@@ -460,7 +460,12 @@ export async function issueCertificate(
   }
 
   const certificate = await db.certificate.create({
-    data: { userId, programId, verificationCode: verificationCode() },
+    data: {
+      userId,
+      programId,
+      holderName: student.name,
+      verificationCode: verificationCode(),
+    },
   });
   await notifyUser(
     userId,
@@ -499,12 +504,20 @@ export async function issueManualCertificate(
   formData: FormData,
 ): Promise<FormState> {
   const admin = await verifyAdmin();
+  const holderName = fieldValue(formData, 'holderName');
   const userId = fieldValue(formData, 'userId');
   const programId = fieldValue(formData, 'programId');
   const issuedAt = parseCertificateDate(fieldValue(formData, 'issuedAt'));
 
-  if (!userId || !programId) {
-    return { status: 'error', message: 'Choose a student and programme.' };
+  if (!holderName || holderName.length < 2 || holderName.length > 160) {
+    return {
+      status: 'error',
+      message: 'Enter the student name as it should appear on the certificate.',
+      errors: { holderName: 'Use a name between 2 and 160 characters.' },
+    };
+  }
+  if (!programId) {
+    return { status: 'error', message: 'Choose a programme.' };
   }
   if (!issuedAt) {
     return {
@@ -515,22 +528,29 @@ export async function issueManualCertificate(
   }
 
   const [student, program, existing] = await Promise.all([
-    db.user.findFirst({
-      where: { id: userId, role: 'STUDENT' },
-      select: { id: true, name: true, email: true },
-    }),
+    userId
+      ? db.user.findFirst({
+          where: { id: userId, role: 'STUDENT' },
+          select: { id: true, name: true, email: true },
+        })
+      : Promise.resolve(null),
     db.program.findUnique({
       where: { id: programId },
       select: { id: true, title: true },
     }),
-    db.certificate.findUnique({
-      where: { userId_programId: { userId, programId } },
-      select: { verificationCode: true },
-    }),
+    userId
+      ? db.certificate.findUnique({
+          where: { userId_programId: { userId, programId } },
+          select: { verificationCode: true },
+        })
+      : Promise.resolve(null),
   ]);
 
-  if (!student || !program) {
-    return { status: 'error', message: 'Unknown student or programme.' };
+  if (userId && !student) {
+    return { status: 'error', message: 'Unknown student account.' };
+  }
+  if (!program) {
+    return { status: 'error', message: 'Unknown programme.' };
   }
   if (existing) {
     return {
@@ -552,7 +572,13 @@ export async function issueManualCertificate(
 
   const certificate = await db.$transaction(async (tx) => {
     const created = await tx.certificate.create({
-      data: { userId, programId, issuedAt, verificationCode: verificationCode() },
+      data: {
+        userId: userId || undefined,
+        programId,
+        holderName,
+        issuedAt,
+        verificationCode: verificationCode(),
+      },
     });
 
     await tx.certificateSignature.createMany({
@@ -562,14 +588,16 @@ export async function issueManualCertificate(
       ],
     });
 
-    await tx.notification.create({
-      data: {
-        userId,
-        title: 'Certificate issued',
-        body: `Your certificate for ${program.title} is ready.`,
-        href: '/certificate',
-      },
-    });
+    if (student) {
+      await tx.notification.create({
+        data: {
+          userId: student.id,
+          title: 'Certificate issued',
+          body: `Your certificate for ${program.title} is ready.`,
+          href: '/certificate',
+        },
+      });
+    }
     await tx.auditLog.create({
       data: {
         actorId: admin.id,
@@ -577,7 +605,8 @@ export async function issueManualCertificate(
         entity: 'Certificate',
         entityId: created.id,
         metadata: {
-          userId,
+          ...(userId ? { userId } : {}),
+          holderName,
           programId,
           verificationCode: created.verificationCode,
           issuedAt: issuedAt.toISOString(),
@@ -591,15 +620,17 @@ export async function issueManualCertificate(
   revalidatePath('/admin', 'layout');
   revalidatePath('/learning', 'layout');
 
-  await tryEmail(
-    student.email,
-    'Your Cyconet certificate is ready',
-    `Hello ${student.name},\n\nYour certificate for ${program.title} has been issued.\n\nVerification code: ${certificate.verificationCode}\n\nRegards,\nCyconet`,
-  );
+  if (student) {
+    await tryEmail(
+      student.email,
+      'Your Cyconet certificate is ready',
+      `Hello ${student.name},\n\nYour certificate for ${program.title} has been issued.\n\nVerification code: ${certificate.verificationCode}\n\nRegards,\nCyconet`,
+    );
+  }
 
   return {
     status: 'success',
-    message: `Certificate issued to ${student.name}. Verification code: ${certificate.verificationCode}`,
+    message: `Certificate issued to ${holderName}. Verification code: ${certificate.verificationCode}`,
   };
 }
 

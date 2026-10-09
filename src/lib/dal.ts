@@ -886,7 +886,7 @@ export async function certificateByCode(code: string) {
   if (!certificate) return null;
 
   return {
-    holder: certificate.user.name,
+    holder: certificate.holderName ?? certificate.user?.name ?? 'Certificate holder',
     program: certificate.program.title,
     duration: certificate.program.duration,
     issuedAt: certificate.issuedAt,
@@ -911,7 +911,7 @@ export async function certificateForPdfByCode(code: string) {
   if (!certificate) return null;
 
   return {
-    holder: certificate.user.name,
+    holder: certificate.holderName ?? certificate.user?.name ?? 'Certificate holder',
     program: certificate.program.title,
     duration: certificate.program.duration,
     issuedAt: certificate.issuedAt,

@@ -44,7 +44,7 @@ export async function GET(
   if (!certificate) notFound();
 
   const pdf = renderCertificatePdf({
-    holderName: certificate.user.name,
+    holderName: certificate.holderName ?? certificate.user?.name ?? user.name,
     programTitle: certificate.program.title,
     programDuration: certificate.program.duration,
     issuedAt: certificate.issuedAt,

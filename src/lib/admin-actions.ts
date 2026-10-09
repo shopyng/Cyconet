@@ -345,6 +345,17 @@ const SIGNATURE_FILE_SIGNATURES: readonly {
   { mime: 'image/jpeg', magic: [0xff, 0xd8, 0xff] },
 ];
 
+type SignatureUpload = {
+  data: Buffer;
+  mimeType: 'image/png' | 'image/jpeg';
+  fileName: string;
+  size: number;
+};
+
+type SignatureUploadResult =
+  | { success: true; upload: SignatureUpload }
+  | { success: false; error: string };
+
 function sniffSignatureMime(bytes: Uint8Array): 'image/png' | 'image/jpeg' | null {
   for (const signature of SIGNATURE_FILE_SIGNATURES) {
     if (signature.magic.every((byte, index) => bytes[index] === byte)) return signature.mime;
@@ -358,29 +369,33 @@ function signatureFileName(raw: string): string {
   return cleaned || 'signature';
 }
 
-async function readSignatureUpload(formData: FormData, field: string) {
+async function readSignatureUpload(
+  formData: FormData,
+  field: string,
+): Promise<SignatureUploadResult> {
   const file = formData.get(field);
   if (!(file instanceof File) || file.size === 0) {
-    return { error: 'Upload both the director and student signature images.' } as const;
+    return { success: false, error: 'Upload both the director and student signature images.' };
   }
   if (file.size > MAX_SIGNATURE_BYTES) {
-    return { error: 'Each signature image must be 1MB or smaller.' } as const;
+    return { success: false, error: 'Each signature image must be 1MB or smaller.' };
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const mimeType = sniffSignatureMime(bytes);
   if (!mimeType) {
-    return { error: 'Signatures must be PNG or JPEG images.' } as const;
+    return { success: false, error: 'Signatures must be PNG or JPEG images.' };
   }
 
   return {
+    success: true,
     upload: {
       data: Buffer.from(bytes),
       mimeType,
       fileName: signatureFileName(file.name),
       size: bytes.byteLength,
     },
-  } as const;
+  };
 }
 
 function parseCertificateDate(value: string): Date | null {
@@ -525,10 +540,10 @@ export async function issueManualCertificate(
     readSignatureUpload(formData, 'directorSignature'),
     readSignatureUpload(formData, 'studentSignature'),
   ]);
-  if ('error' in director) {
+  if (!director.success) {
     return { status: 'error', message: director.error, errors: { directorSignature: director.error } };
   }
-  if ('error' in studentSignature) {
+  if (!studentSignature.success) {
     return { status: 'error', message: studentSignature.error, errors: { studentSignature: studentSignature.error } };
   }
 

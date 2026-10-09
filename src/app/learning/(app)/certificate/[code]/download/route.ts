@@ -3,6 +3,7 @@ import { verifySession } from '@/lib/dal';
 import { db } from '@/lib/db';
 import { apexUrl } from '@/lib/tenant';
 import { renderCertificatePdf, certificateFileName } from '@/lib/certificate-pdf';
+import type { PdfImage } from '@/lib/pdf';
 
 /**
  * The signed-in student's own certificate, as a PDF.
@@ -69,7 +70,7 @@ export async function GET(
 function imageForSignature(
   signatures: readonly { kind: string; data: Uint8Array | Buffer; mimeType: string }[],
   kind: 'DIRECTOR' | 'STUDENT',
-) {
+): PdfImage | undefined {
   const signature = signatures.find((entry) => entry.kind === kind);
   if (!signature) return undefined;
   if (signature.mimeType !== 'image/png' && signature.mimeType !== 'image/jpeg') return undefined;
